@@ -57,14 +57,20 @@ endif
 
 ifeq (ios,$(target))
   ifneq (armv7, $(arch))
-    $(error $(arch) not supported for target 'ios')
+    ifneq (i386, $(arch))
+      $(error $(arch) not supported for target 'ios')
+    else
+      SDKROOT?=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneSimulator.*' 2>/dev/null)
+    endif
+  else
+    SDKROOT?=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)
   endif
-  SDKROOT?=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)
   ifeq (,$(SDKROOT))
     $(error iOS SDK not found)
   endif
   # next, use a single compiler include file for both iOS* and OS X* builds.
   override target:=macos
+  macos_is_ios:=1
 endif
 
 ifndef runtime
