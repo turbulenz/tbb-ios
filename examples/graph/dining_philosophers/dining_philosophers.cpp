@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #if _MSC_VER
@@ -34,19 +26,13 @@
 #include "tbb/flow_graph.h"
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tick_count.h"
+#include "tbb/tbb_thread.h"
 #include "tbb/atomic.h"
 #include "tbb/spin_mutex.h"
 #include <iostream>
 #include "../../common/utility/utility.h"
 #include <cstdlib>
 #include <cstdio>
-
-#if _WIN32 || _WIN64
-#include "windows.h"
-#define SLEEP(a) Sleep(a*1000)
-#else
-#define SLEEP(a) sleep(a)
-#endif
 
 // Each philosopher is an object, and is invoked in the think() function_node, the
 // eat() function_node and forward() multifunction_node.
@@ -63,8 +49,8 @@
 // eat() function_node.  The output of the eat() function_node is sent to the forward()
 // multifunction_node.
 
-const int think_time = 1;
-const int eat_time = 1;
+const tbb::tick_count::interval_t think_time(1.0);
+const tbb::tick_count::interval_t eat_time(1.0);
 const int num_times = 10;
 
 tbb::tick_count t0;
@@ -126,7 +112,7 @@ typedef multifunction_node<continue_msg, join_output> forward_node_type;
 class philosopher {
 public:
 
-    philosopher( const char *name ) : 
+    philosopher( const char *name ) :
         my_name(name), my_count(num_times) { }
 
     ~philosopher() {
@@ -152,7 +138,7 @@ private:
 };
 
 std::ostream& operator<<(std::ostream& o, philosopher const &p) {
-    o << "< philosopher[" << reinterpret_cast<uintptr_t>(const_cast<philosopher *>(&p)) << "] " << p.name() 
+    o << "< philosopher[" << reinterpret_cast<uintptr_t>(const_cast<philosopher *>(&p)) << "] " << p.name()
         << ", my_count=" << p.my_count;
     return o;
 }
@@ -165,7 +151,7 @@ public:
     continue_msg operator()( continue_msg /*m*/) {
         my_philosopher.think();
         return continue_msg();
-    } 
+    }
 };
 
 class eat_node_body {
@@ -216,19 +202,19 @@ void philosopher::eat() {
         tbb::spin_mutex::scoped_lock lock(my_mutex);
         std::printf("%s eating\n", name());
     }
-    SLEEP(eat_time); 
+    tbb::this_tbb_thread::sleep(eat_time);
     if(verbose) {
         tbb::spin_mutex::scoped_lock lock(my_mutex);
         std::printf("%s done eating\n", name());
     }
 }
 
-void philosopher::think() { 
+void philosopher::think() {
     if(verbose) {
         tbb::spin_mutex::scoped_lock lock(my_mutex);
         std::printf("%s thinking\n", name());
     }
-    SLEEP(think_time); 
+    tbb::this_tbb_thread::sleep(think_time);
     if(verbose) {
         tbb::spin_mutex::scoped_lock lock(my_mutex);
         std::printf("%s done thinking\n", name());
@@ -248,7 +234,7 @@ int main(int argc, char *argv[]) {
         verbose = !options.silent;
 
     for(num_threads = options.threads.first; num_threads <= options.threads.last; num_threads = options.threads.step(num_threads)) {
-    
+
         tbb::task_scheduler_init init(num_threads);
 
             graph g;

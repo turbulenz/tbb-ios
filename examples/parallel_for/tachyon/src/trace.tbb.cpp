@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 /*
@@ -237,10 +229,12 @@ public:
 
 void * thread_trace(thr_parms * parms)
 {
+#if !WIN8UI_EXAMPLE
     int n, nthreads = tbb::task_scheduler_init::automatic;
     char *nthreads_str = getenv ("TBB_NUM_THREADS");
     if (nthreads_str && (sscanf (nthreads_str, "%d", &n) > 0) && (n > 0)) nthreads = n;
     tbb::task_scheduler_init init (nthreads);
+#endif
 
     // shared but read-only so could be private too
     all_parms = parms;
@@ -255,7 +249,10 @@ void * thread_trace(thr_parms * parms)
     thread_ids.clear();
 #endif
 
-    int g, grain_size = 8;
+    int grain_size = 8;
+//WIN8UI does not support getenv() function so using auto_partitioner unconditionally
+#if !WIN8UI_EXAMPLE
+    int g;
     char *grain_str = getenv ("TBB_GRAINSIZE");
     if (grain_str && (sscanf (grain_str, "%d", &g) > 0) && (g > 0)) grain_size = g;
     char *sched_str = getenv ("TBB_PARTITIONER");
@@ -265,6 +262,7 @@ void * thread_trace(thr_parms * parms)
     else if ( sched_str && !strncmp(sched_str, "simp", 4) )
         tbb::parallel_for (tbb::blocked_range2d<int> (starty, stopy, grain_size, startx, stopx, grain_size), parallel_task (), tbb::simple_partitioner());
     else
+#endif
         tbb::parallel_for (tbb::blocked_range2d<int> (starty, stopy, grain_size, startx, stopx, grain_size), parallel_task (), tbb::auto_partitioner());
 
     return(NULL);  

@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef __TBB_dynamic_link
@@ -33,7 +25,10 @@
 
 #include "tbb/tbb_stddef.h"
 
-#ifndef LIBRARY_ASSERT
+#ifdef LIBRARY_ASSERT
+    #undef __TBB_ASSERT
+    #define __TBB_ASSERT(x,y) LIBRARY_ASSERT(x,y)
+#else
     #define LIBRARY_ASSERT(x,y) __TBB_ASSERT_EX(x,y)
 #endif /* !LIBRARY_ASSERT */
 
@@ -87,15 +82,20 @@ const int DYNAMIC_LINK_WEAK   = 0x04;
 const int DYNAMIC_LINK_ALL    = DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK;
 
 //! Fill in dynamically linked handlers.
-/** 'required' is the number of the initial entries in the array descriptors[]
+/** 'library' is the name of the requested library. It should not contain a full
+    path since dynamic_link adds the full path (from which the runtime itself
+    was loaded) to the library name.
+    'required' is the number of the initial entries in the array descriptors[]
     that have to be found in order for the call to succeed. If the library and
-    all the required handlers are found, then the corresponding handler pointers
-    are set, and the return value is true.  Otherwise the original array of
-    descriptors is left untouched and the return value is false. 'required' is
-    limited by 20 (exceeding of this value will result in failure to load the
-    symbols and the return value will be false).
-    'dl_allowed' flag allows dynamic library loading if the global symbols
-    searching mechanism has failed.
+    all the required handlers are found, then the corresponding handler
+    pointers are set, and the return value is true.  Otherwise the original
+    array of descriptors is left untouched and the return value is false.
+    'required' is limited by 20 (exceeding of this value will result in failure
+    to load the symbols and the return value will be false).
+    'handle' is the handle of the library if it is loaded. Otherwise it is left
+    untouched.
+    'flags' is the set of DYNAMIC_LINK_* flags. Each of the DYNAMIC_LINK_* flags
+    allows its corresponding linking stage.
 **/
 bool dynamic_link( const char* library,
                    const dynamic_link_descriptor descriptors[],

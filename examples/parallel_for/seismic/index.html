@@ -27,7 +27,7 @@ NOTE: Currently, the offload version does not support GUI and can only be used w
 <H2>Directories</H2>
 <DL>
 <DT><A HREF="msvs">msvs</A>
-<DD>Contains Microsoft* Visual Studio* 2005 workspace for building and running the 
+<DD>Contains Microsoft* Visual Studio* 2010 workspace for building and running the 
     example (Windows* systems only).<DT><A HREF="xcode">xcode</A>
 <DD>Contains Xcode* IDE workspace for building and running the example (OS X* 
     systems only).</DL>
@@ -36,14 +36,13 @@ NOTE: Currently, the offload version does not support GUI and can only be used w
 General build directions can be found <A HREF=../../index.html#build>here</A>.
 The following additional options are supported:
 <DL>
-<DT><TT>make [(general targets: {release, debug} [test])] UI={con, gdi, dd, d2d, x, mac}</TT>
-<DD>Build and run as usual, but build with the specified GUI driver: console, GDI+*, DirectDraw*, 
+<DT><TT>make [(general targets: {release, debug} [test])] UI={con, gdi, d2d, x, mac}</TT>
+<DD>Build and run as usual, but build with the specified GUI driver: console, GDI+*,  
     Direct2D*, X11, or OpenGL*
     (see the description of the <A HREF=../../common/index.html>common GUI code</A>
     for more information on available graphics support).
     For Linux* and OS X* systems, the best available driver is detected automatically by the Makefile.
-    For Windows* systems, UI=gdi is the default GUI driver; compiling with UI=dd or 
-    UI=d2d may offer superior
+    For Windows* systems, UI=gdi is the default GUI driver; compiling with UI=d2d may offer superior
     performance, but can only be used if the Microsoft* DirectX* SDK is installed on your system 
     and if overlay is supported by your graphics card.
     Use UI=con to build without the GUI for use in making performance measurements
@@ -103,7 +102,7 @@ user interface:
 <HR>
 <A HREF="../index.html">Up to parent directory</A>
 <p></p>
-Copyright &copy; 2005-2013 Intel Corporation.  All Rights Reserved.
+Copyright &copy; 2005-2014 Intel Corporation.  All Rights Reserved.
 <P></P>
 Intel is a registered trademark or trademark of Intel Corporation
 or its subsidiaries in the United States and other countries.

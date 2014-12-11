@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #if _MSC_VER
@@ -106,7 +98,7 @@ int main(int argc, char *argv[]) {
             }
 
             { // test two-input and_gate: 00, 01, 10, 11
-                and_gate<two_input> a(g);
+                and_gate<2> a(g);
                 toggle input0(g);
                 toggle input1(g);
                 led output(g, "OUTPUT", false);
@@ -135,7 +127,7 @@ int main(int argc, char *argv[]) {
             }
 
             { // test three-input or_gate: 000, 001, 010, 100, 011, 101, 110, 111
-                or_gate<three_input> o(g);
+                or_gate<3> o(g);
                 toggle input0(g);
                 toggle input1(g);
                 toggle input2(g);
@@ -182,7 +174,7 @@ int main(int argc, char *argv[]) {
             }
 
             { // test two-input xor_gate: 00, 01, 10, 11
-                xor_gate<two_input> x(g);
+                xor_gate<2> x(g);
                 toggle input0(g);
                 toggle input1(g);
                 led output(g, "OUTPUT", false);
@@ -212,7 +204,7 @@ int main(int argc, char *argv[]) {
 
 
             { // test two-input nor_gate: 00, 01, 10, 11
-                nor_gate<two_input> n(g);
+                nor_gate<2> n(g);
                 toggle input0(g);
                 toggle input1(g);
                 led output(g, "OUTPUT", false);
@@ -243,10 +235,10 @@ int main(int argc, char *argv[]) {
             { // test steady_signal and digit
                 steady_signal input0(g, high);
                 steady_signal input1(g, low);
-                and_gate<two_input> a(g);
-                or_gate<two_input> o(g);
-                xor_gate<two_input> x(g);
-                nor_gate<two_input> n(g);
+                and_gate<2> a(g);
+                or_gate<2> o(g);
+                xor_gate<2> x(g);
+                nor_gate<2> n(g);
                 digit output(g, "OUTPUT", false);
                 
                 make_edge(input0.get_out(), a.get_in(0));

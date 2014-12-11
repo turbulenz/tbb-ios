@@ -1,34 +1,27 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #include "tbb/tbb_config.h"
 #include "tbb_main.h"
 #include "governor.h"
+#include "market.h"
 #include "tbb_misc.h"
 #include "itt_notify.h"
 
@@ -51,8 +44,9 @@ rml::tbb_factory governor::theRMLServerFactory;
 bool governor::UsePrivateRML;
 const task_scheduler_init *governor::BlockingTSI;
 #if TBB_USE_ASSERT
-bool governor::IsBlockingTermiantionInProgress;
+bool governor::IsBlockingTerminationInProgress;
 #endif
+bool governor::is_speculation_enabled;
 
 //------------------------------------------------------------------------
 // market data
@@ -133,8 +127,10 @@ void __TBB_InitOnce::add_ref() {
 void __TBB_InitOnce::remove_ref() {
     int k = --count;
     __TBB_ASSERT(k>=0,"removed __TBB_InitOnce ref that was not added?"); 
-    if( k==0 ) 
+    if( k==0 ) {
         governor::release_resources();
+        ITT_FINI_ITTLIB();
+    }
 }
 
 //------------------------------------------------------------------------
@@ -149,11 +145,60 @@ void Scheduler_OneTimeInitialization ( bool itt_present );
 
 #if DO_ITT_NOTIFY
 
+#if __TBB_ITT_STRUCTURE_API
+
+static __itt_domain *fgt_domain = NULL;
+
+struct resource_string {
+    const char *str;
+    __itt_string_handle *itt_str_handle;
+};
+
+//
+// populate resource strings
+//
+#define TBB_STRING_RESOURCE( index_name, str ) { str, NULL },
+static resource_string strings_for_itt[] = {
+    #include "tbb/internal/_tbb_strings.h"
+    { "num_resource_strings", NULL } 
+};
+#undef TBB_STRING_RESOURCE
+
+static __itt_string_handle *ITT_get_string_handle(int idx) {
+    __TBB_ASSERT(idx >= 0, NULL);
+    return idx < NUM_STRINGS ? strings_for_itt[idx].itt_str_handle : NULL;
+}
+
+static void ITT_init_domains() {
+    fgt_domain = __itt_domain_create( _T("tbb.flow") );
+    fgt_domain->flags = 1;
+}
+
+static void ITT_init_strings() {
+    for ( int i = 0; i < NUM_STRINGS; ++i ) {
+#if _WIN32||_WIN64
+        strings_for_itt[i].itt_str_handle = __itt_string_handle_createA( strings_for_itt[i].str );
+#else
+        strings_for_itt[i].itt_str_handle = __itt_string_handle_create( strings_for_itt[i].str );
+#endif
+    }
+}
+
+static void ITT_init() {
+    ITT_init_domains();
+    ITT_init_strings();
+}
+
+#endif // __TBB_ITT_STRUCTURE_API
+
 /** Thread-unsafe lazy one-time initialization of tools interop.
     Used by both dummy handlers and general TBB one-time initialization routine. **/
 void ITT_DoUnsafeOneTimeInitialization () {
     if ( !ITT_InitializationDone ) {
         ITT_Present = (__TBB_load_ittnotify()!=0);
+#if __TBB_ITT_STRUCTURE_API
+        if (ITT_Present) ITT_init();
+#endif
         ITT_InitializationDone = true;
         ITT_SYNC_CREATE(&market::theMarketMutex, SyncType_GlobalLock, SyncObj_SchedulerInitialization);
     }
@@ -171,6 +216,7 @@ void ITT_DoOneTimeInitialization() {
 
 //! Performs thread-safe lazy one-time general TBB initialization.
 void DoOneTimeInitializations() {
+    suppress_unused_warning(_pad);
     __TBB_InitOnce::lock();
     // No fence required for load of InitializationDone, because we are inside a critical section.
     if( !__TBB_InitOnce::InitializationDone ) {
@@ -243,14 +289,113 @@ void call_itt_notify_v5(int t, void *ptr) {
 void call_itt_notify_v5(int /*t*/, void* /*ptr*/) {}
 #endif
 
+#if __TBB_ITT_STRUCTURE_API
+
+#if DO_ITT_NOTIFY
+
+const __itt_id itt_null_id = {0, 0, 0};
+
+static inline __itt_domain* get_itt_domain( itt_domain_enum idx ) {
+    return ( idx == ITT_DOMAIN_FLOW ) ? fgt_domain : NULL;
+}
+
+static inline void itt_id_make(__itt_id *id, void* addr, unsigned long long extra) {
+    *id = __itt_id_make(addr, extra);
+}
+
+static inline void itt_id_create(const __itt_domain *domain, __itt_id id) {
+    ITTNOTIFY_VOID_D1(id_create, domain, id);
+}
+
+void itt_make_task_group_v7( itt_domain_enum domain, void *group, unsigned long long group_extra, 
+                             void *parent, unsigned long long parent_extra, string_index name_index ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id group_id = itt_null_id;
+        __itt_id parent_id = itt_null_id;
+        itt_id_make( &group_id, group, group_extra );
+        itt_id_create( d, group_id );
+        if ( parent ) {
+            itt_id_make( &parent_id, parent, parent_extra );
+        }
+        __itt_string_handle *n = ITT_get_string_handle(name_index);
+        ITTNOTIFY_VOID_D3(task_group, d, group_id, parent_id, n);
+    }
+}
+
+void itt_metadata_str_add_v7( itt_domain_enum domain, void *addr, unsigned long long addr_extra, 
+                              string_index key, const char *value ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id id = itt_null_id;
+        itt_id_make( &id, addr, addr_extra );
+        __itt_string_handle *k = ITT_get_string_handle(key);
+       size_t value_length = strlen( value );
+#if _WIN32||_WIN64
+        ITTNOTIFY_VOID_D4(metadata_str_addA, d, id, k, value, value_length);
+#else
+        ITTNOTIFY_VOID_D4(metadata_str_add, d, id, k, value, value_length);
+#endif
+    }
+}
+
+void itt_relation_add_v7( itt_domain_enum domain, void *addr0, unsigned long long addr0_extra, 
+                          itt_relation relation, void *addr1, unsigned long long addr1_extra ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id id0 = itt_null_id; 
+        __itt_id id1 = itt_null_id;
+        itt_id_make( &id0, addr0, addr0_extra );
+        itt_id_make( &id1, addr1, addr1_extra );
+        ITTNOTIFY_VOID_D3(relation_add, d, id0, (__itt_relation)relation, id1); 
+    }
+}
+
+void itt_task_begin_v7( itt_domain_enum domain, void *task, unsigned long long task_extra, 
+                        void *parent, unsigned long long parent_extra, string_index /* name_index */ ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        __itt_id task_id = itt_null_id;
+        __itt_id parent_id = itt_null_id;
+        itt_id_make( &task_id, task, task_extra );
+        if ( parent ) {
+            itt_id_make( &parent_id, parent, parent_extra );
+        }
+        ITTNOTIFY_VOID_D3(task_begin, d, task_id, parent_id, NULL );
+    }
+}
+
+void itt_task_end_v7( itt_domain_enum domain ) {
+    if ( __itt_domain *d = get_itt_domain( domain ) ) {
+        ITTNOTIFY_VOID_D0(task_end, d);
+    }
+}
+
+#else // DO_ITT_NOTIFY
+
+void itt_make_task_group_v7( itt_domain_enum domain, void *group, unsigned long long group_extra, 
+                             void *parent, unsigned long long parent_extra, string_index name_index ) { }
+
+void itt_metadata_str_add_v7( itt_domain_enum domain, void *addr, unsigned long long addr_extra, 
+                              string_index key, const char *value ) { }
+
+void itt_relation_add_v7( itt_domain_enum domain, void *addr0, unsigned long long addr0_extra, 
+                          itt_relation relation, void *addr1, unsigned long long addr1_extra ) { }
+
+void itt_task_begin_v7( itt_domain_enum domain, void *task, unsigned long long task_extra, 
+                        void * /*parent*/, unsigned long long /* parent_extra */, string_index /* name_index */ ) { }
+
+void itt_task_end_v7( itt_domain_enum domain ) { }
+
+#endif // DO_ITT_NOTIFY
+
+#endif // __TBB_ITT_STRUCTURE_API
+
 void* itt_load_pointer_v3( const void* src ) {
+    //TODO: replace this with __TBB_load_relaxed
     void* result = *static_cast<void*const*>(src);
     return result;
 }
 
 void itt_set_sync_name_v3( void* obj, const tchar* name) {
     ITT_SYNC_RENAME(obj, name);
-    suppress_unused_warning(obj && name);
+    suppress_unused_warning(obj, name);
 }
 
 

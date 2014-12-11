@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 // Do not include task.h directly. Use scheduler_common.h instead
@@ -74,18 +66,24 @@ void allocate_root_proxy::free( task& task ) {
 task& allocate_root_with_context_proxy::allocate( size_t size ) const {
     internal::generic_scheduler* s = governor::local_scheduler();
     __TBB_ASSERT( s, "Scheduler auto-initialization failed?" );
+    __TBB_ASSERT( &my_context, "allocate_root(context) argument is a dereferenced NULL pointer" );
     task& t = s->allocate_task( size, NULL, &my_context );
     // Supported usage model prohibits concurrent initial binding. Thus we do not
     // need interlocked operations or fences to manipulate with my_context.my_kind
-    if ( my_context.my_kind == task_group_context::binding_required ) {
+    if ( __TBB_load_relaxed(my_context.my_kind) == task_group_context::binding_required ) {
         // If we are in the outermost task dispatch loop of a master thread, then
         // there is nothing to bind this context to, and we skip the binding part
         // treating the context as isolated.
-        if ( s->my_innermost_running_task == s->my_dummy_task )
-            my_context.my_kind = task_group_context::isolated;
+        if ( s->master_outermost_level() )
+            __TBB_store_relaxed(my_context.my_kind, task_group_context::isolated);
         else
             my_context.bind_to( s );
     }
+#if __TBB_FP_CONTEXT
+    if ( __TBB_load_relaxed(my_context.my_kind) == task_group_context::isolated &&
+            !(my_context.my_version_and_traits & task_group_context::fp_settings) )
+        my_context.copy_fp_settings( *s->my_arena->my_default_ctx );
+#endif
     ITT_STACK_CREATE(my_context.itt_caller);
     return t;
 }
@@ -156,7 +154,7 @@ void allocate_additional_child_of_proxy::free( task& task ) const {
 //------------------------------------------------------------------------
 size_t get_initial_auto_partitioner_divisor() {
     const size_t X_FACTOR = 4;
-    return X_FACTOR * (governor::max_number_of_workers()+1);
+    return X_FACTOR * (1+governor::local_scheduler()->number_of_workers_in_my_arena());
 }
 
 //------------------------------------------------------------------------
@@ -164,7 +162,7 @@ size_t get_initial_auto_partitioner_divisor() {
 //------------------------------------------------------------------------
 void affinity_partitioner_base_v3::resize( unsigned factor ) {
     // Check factor to avoid asking for number of workers while there might be no arena.
-    size_t new_size = factor ? factor*(governor::max_number_of_workers()+1) : 0;
+    size_t new_size = factor ? factor*(1+governor::local_scheduler()->number_of_workers_in_my_arena()) : 0;
     if( new_size!=my_size ) {
         if( my_array ) {
             NFS_Free( my_array );
@@ -226,11 +224,14 @@ void interface5::internal::task_base::destroy( task& victim ) {
     task* parent = victim.parent();
     victim.~task();
     if( parent ) {
-        __TBB_ASSERT( parent->state()==task::allocated, "attempt to destroy child of running or corrupted parent?" );
+        __TBB_ASSERT( parent->state()!=task::freed && parent->state()!=task::ready,
+                      "attempt to destroy child of running or corrupted parent?" );
+        // 'reexecute' and 'executing' are also signs of a race condition, since most tasks
+        // set their ref_count upon entry but "es_ref_count_active" should detect this
         parent->internal_decrement_ref_count();
         // Even if the last reference to *parent is removed, it should not be spawned (documented behavior).
     }
-    governor::local_scheduler()->free_task<no_hint>( victim );
+    governor::local_scheduler()->free_task<no_cache>( victim );
 }
 
 void task::spawn_and_wait_for_all( task_list& list ) {
@@ -253,16 +254,21 @@ void task::note_affinity( affinity_id ) {
 #if __TBB_TASK_GROUP_CONTEXT
 void task::change_group ( task_group_context& ctx ) {
     prefix().context = &ctx;
-    if ( ctx.my_kind == task_group_context::binding_required ) {
-        internal::generic_scheduler* s = governor::local_scheduler();
+    internal::generic_scheduler* s = governor::local_scheduler();
+    if ( __TBB_load_relaxed(ctx.my_kind) == task_group_context::binding_required ) {
         // If we are in the outermost task dispatch loop of a master thread, then
         // there is nothing to bind this context to, and we skip the binding part
         // treating the context as isolated.
-        if ( s->my_innermost_running_task == s->my_dummy_task )
-            ctx.my_kind = task_group_context::isolated;
+        if ( s->master_outermost_level() )
+            __TBB_store_relaxed(ctx.my_kind, task_group_context::isolated);
         else
             ctx.bind_to( s );
     }
+#if __TBB_FP_CONTEXT
+    if ( __TBB_load_relaxed(ctx.my_kind) == task_group_context::isolated &&
+            !(ctx.my_version_and_traits & task_group_context::fp_settings) )
+        ctx.copy_fp_settings( *s->my_arena->my_default_ctx );
+#endif
     ITT_STACK_CREATE(ctx.itt_caller);
 }
 #endif /* __TBB_TASK_GROUP_CONTEXT */

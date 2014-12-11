@@ -1,30 +1,27 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
+
+#include "harness_defs.h"
+
+#define HARNESS_DEFAULT_MIN_THREADS 2
+#define HARNESS_DEFAULT_MAX_THREADS 4
 
 #if _MSC_VER
     #pragma warning (disable: 4503) // Suppress "decorated name length exceeded, name was truncated" warning
@@ -32,10 +29,11 @@
         // Suppress "C++ exception handler used, but unwind semantics are not enabled" warning in STL headers
         #pragma warning (disable: 4530)
     #endif
-    #if _MSC_VER==1700 && !defined(__INTEL_COMPILER)
-        // Suppress "unreachable code" warning by VC++ 17.0 (VS 2012)
-        #pragma warning (disable: 4702)
-    #endif
+#endif
+
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    // Suppress "unreachable code" warning by VC++ 17.0-18.0 (VS 2012 or newer)
+    #pragma warning (disable: 4702)
 #endif
 
 #include "harness.h"
@@ -44,7 +42,12 @@
 // participating.  That was the hope, but it counts the entries into the marketplace,
 // not the arena.
 // #define USE_TASK_SCHEDULER_OBSERVER 1
-#define TBB_PREVIEW_GRAPH_NODES 1
+
+#if _MSC_VER && defined(__INTEL_COMPILER) && !TBB_USE_DEBUG
+    #define TBB_RUN_BUFFERING_TEST __INTEL_COMPILER > 1210
+#else
+    #define TBB_RUN_BUFFERING_TEST 1
+#endif
 
 #if TBB_USE_EXCEPTIONS
 #if USE_TASK_SCHEDULER_OBSERVER
@@ -302,10 +305,10 @@ struct less_body : public std::binary_function<ItemType,ItemType,bool> {
 // --------- tag methods for tag_matching join_node
 template<typename TT>
 class tag_func {
-    const TT my_mult;
-    tag_func& operator=( const tag_func& other);
+    TT my_mult;
 public:
     tag_func(TT multiplier) : my_mult(multiplier) { }
+    void operator=( const tag_func& other){my_mult = other.my_mult;}
     // operator() will return [0 .. Count) 
     tbb::flow::tag_value operator()( TT v) {
         tbb::flow::tag_value t = tbb::flow::tag_value(v / my_mult);
@@ -984,7 +987,6 @@ void run_one_buffer_node_test(bool throwException,bool flog) {
     o.observe(false);
 #endif
 }
-
 template<class BufferItemType,
          TestNodeTypeEnum SourceThrowType,
          TestNodeTypeEnum SinkThrowType>
@@ -1002,6 +1004,7 @@ void run_buffer_queue_and_overwrite_node_test() {
         if(i == 2) continue;  // no need to test flog w/o throws
         bool throwException = (i & 0x1) != 0;
         bool doFlog = (i & 0x2) != 0;
+#if TBB_RUN_BUFFERING_TEST
         run_one_buffer_node_test<
             /* class BufferItemType*/     BufferItemType,
             /*class SourceNodeType*/      SrcType,
@@ -1018,6 +1021,7 @@ void run_buffer_queue_and_overwrite_node_test() {
             /*class SinkNodeType*/        SnkType,
             /*class SinkNodeBodyType*/    SinkBodyType
             >(throwException, doFlog);
+#endif
         run_one_buffer_node_test<
             /* class BufferItemType*/     BufferItemType,
             /*class SourceNodeType*/      SrcType,
@@ -1031,6 +1035,10 @@ void run_buffer_queue_and_overwrite_node_test() {
 
 void test_buffer_queue_and_overwrite_node() {
     REMARK("Testing buffer_node, queue_node and overwrite_node\n");
+#if TBB_RUN_BUFFERING_TEST
+#else
+    REMARK("skip buffer and queue test (known issue)\n");
+#endif
     g_Wakeup_Msg = "buffer, queue, overwrite(is,non): Missed wakeup or machine is overloaded?";
     run_buffer_queue_and_overwrite_node_test<int,isThrowing,nonThrowing>();
     g_Wakeup_Msg = "buffer, queue, overwrite(non,is): Missed wakeup or machine is overloaded?";
@@ -1778,8 +1786,7 @@ void test_split_node() {
     g_Wakeup_Msg = g_Orig_Wakeup_Msg;
 }
 
-#if TBB_PREVIEW_GRAPH_NODES
-// --------- or_node ----------------------
+// --------- indexer_node ----------------------
 
 template < class InputTuple,
     class SourceType0,
@@ -1789,7 +1796,7 @@ template < class InputTuple,
     class TestNodeType,
     class SinkType,
     class SinkBodyType>
-void run_one_or_node_test(bool throwException,bool flog) {
+void run_one_indexer_node_test(bool throwException,bool flog) {
     typedef typename tbb::flow::tuple_element<0,InputTuple>::type ItemType0;
     typedef typename tbb::flow::tuple_element<1,InputTuple>::type ItemType1;
 
@@ -1873,12 +1880,12 @@ void run_one_or_node_test(bool throwException,bool flog) {
 template<class InputTuple,
     TestNodeTypeEnum SourceThrowType,
     TestNodeTypeEnum SinkThrowType>
-void run_or_node_test() {
+void run_indexer_node_test() {
     typedef typename tbb::flow::tuple_element<0,InputTuple>::type ItemType0;
     typedef typename tbb::flow::tuple_element<1,InputTuple>::type ItemType1;
     typedef test_source_body<ItemType0,SourceThrowType> SourceBodyType0;
     typedef test_source_body<ItemType1,SourceThrowType> SourceBodyType1;
-    typedef typename tbb::flow::or_node<InputTuple> TestNodeType;
+    typedef typename tbb::flow::indexer_node<ItemType0, ItemType1> TestNodeType;
     typedef absorber_body<typename TestNodeType::output_type,tbb::flow::continue_msg,SinkThrowType,unlimited_type> SinkBodyType;
 
     typedef typename tbb::flow::source_node<ItemType0> SourceType0;
@@ -1889,7 +1896,7 @@ void run_or_node_test() {
         if(2 == i) continue;
         bool throwException = (i & 0x1) != 0;
         bool doFlog = (i & 0x2) != 0;
-        run_one_or_node_test<
+        run_one_indexer_node_test<
              InputTuple,
              SourceType0,
              SourceBodyType0,
@@ -1901,17 +1908,16 @@ void run_or_node_test() {
     }
 }
 
-void test_or_node() {
-    REMARK("Testing or_node\n");
-    g_Wakeup_Msg = "or_node(is,non): Missed wakeup or machine is overloaded?";
-    run_or_node_test<tbb::flow::tuple<int,int>, isThrowing, nonThrowing>();
-    g_Wakeup_Msg = "or_node(non,is): Missed wakeup or machine is overloaded?";
-    run_or_node_test<tbb::flow::tuple<int,int>, nonThrowing, isThrowing>();
-    g_Wakeup_Msg = "or_node(is,is): Missed wakeup or machine is overloaded?";
-    run_or_node_test<tbb::flow::tuple<int,int>, isThrowing,  isThrowing>();
+void test_indexer_node() {
+    REMARK("Testing indexer_node\n");
+    g_Wakeup_Msg = "indexer_node(is,non): Missed wakeup or machine is overloaded?";
+    run_indexer_node_test<tbb::flow::tuple<int,int>, isThrowing, nonThrowing>();
+    g_Wakeup_Msg = "indexer_node(non,is): Missed wakeup or machine is overloaded?";
+    run_indexer_node_test<tbb::flow::tuple<int,int>, nonThrowing, isThrowing>();
+    g_Wakeup_Msg = "indexer_node(is,is): Missed wakeup or machine is overloaded?";
+    run_indexer_node_test<tbb::flow::tuple<int,int>, isThrowing,  isThrowing>();
     g_Wakeup_Msg = g_Orig_Wakeup_Msg;;
 }
-#endif
 
 ///////////////////////////////////////////////
 // whole-graph exception test
@@ -2011,11 +2017,7 @@ void TestOneThreadNum(int nThread) {
         // not do try_puts after it has been set.  To get parallelism of N we have
         // to attach N successor nodes to the write_once (or play some similar game).
         // test_write_once_node();
-#if TBB_PREVIEW_GRAPH_NODES
-        test_or_node();
-#else
-        REMARK("or_node test skipped\n");
-#endif
+        test_indexer_node();
     }
 }
 #endif // TBB_USE_EXCEPTIONS

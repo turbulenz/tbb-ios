@@ -74,7 +74,7 @@ The following versions of the example are provided:
 <DT><A HREF="dat">dat</A>
 <DD>Contains data sets for running the example.
 <DT><A HREF="msvs">msvs</A>
-<DD>Contains Microsoft* Visual Studio* 2005 workspace for building and running the 
+<DD>Contains Microsoft* Visual Studio* 2010 workspace for building and running the 
     example (Windows* systems only).<DT><A HREF="xcode">xcode</A>
 <DD>Contains Xcode* IDE workspace for building and running the example (OS X* 
     systems only).</DL>
@@ -109,14 +109,12 @@ Here, &lt;<I>version</I>&gt; is one of the above versions of the example, i.e., 
 <DT><TT>make [(above options or targets)] ARGS=-D</TT>
 <DD>Build and run as above, but run with disabled run-time display updating for use in making performance measurements
     <I>(strongly recommended when measuring performance or scalability; see note below)</I>.
-<DT><TT>make [(above options or targets)] UI={con, gdi, dd, d2d, x, mac}</TT>
-<DD>Build and run as usual, but build with the specified GUI driver: console, GDI+*, DirectDraw*, 
-    Direct2D*, X11, or OpenGL*
+<DT><TT>make [(above options or targets)] UI={con, gdi, d2d, x, mac}</TT>
+<DD>Build and run as usual, but build with the specified GUI driver: console, GDI+*, Direct2D*, X11, or OpenGL*
 	(see the description of the <A HREF=../../common/index.html>common GUI code</A>
 	for more information on available graphics support).
     For Linux* and OS X* systems, the best available driver is detected automatically by the Makefile.
-    For Windows* systems, UI=gdi is the default GUI driver; compiling with UI=dd or 
-    UI=d2d may offer superior
+    For Windows* systems, UI=gdi is the default GUI driver; compiling with UI=d2d may offer superior
 	performance, but can only be used if the Microsoft* DirectX* SDK is installed on your system.
     Use UI=con to build without the GUI for use in making performance measurements
 	<I>(strongly recommended when measuring performance or scalability; see note below)</I>.
@@ -174,7 +172,7 @@ While running with the GUI display turned on the following keyboard keys can be 
 <HR>
 <A HREF="../index.html">Up to parent directory</A>
 <p></p>
-Copyright &copy; 2005-2013 Intel Corporation.  All Rights Reserved.
+Copyright &copy; 2005-2014 Intel Corporation.  All Rights Reserved.
 <P></P>
 Intel is a registered trademark or trademark of Intel Corporation
 or its subsidiaries in the United States and other countries.

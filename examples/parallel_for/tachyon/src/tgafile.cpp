@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 /*
@@ -56,9 +48,7 @@
 */
 
 /* 
- * tgafile.c - This file contains the code to write 24 bit targa files...
- *
- *  $Id: tgafile.cpp,v 1.2 2007-02-22 17:54:16 Exp $
+ * tgafile.cpp - This file contains the code to write 24 bit targa files...
  */
 
 #include "machine.h"
@@ -133,7 +123,8 @@ void writetgaregion(void * voidofp,
                     int stopx, int stopy, char * buffer) {
   int y, totalx, totaly;
   char * bufpos;
-  int filepos, numbytes;
+  long filepos;
+  size_t numbytes;
   FILE * ofp = (FILE *) voidofp;
  
   totalx = stopx - startx + 1;
@@ -141,7 +132,7 @@ void writetgaregion(void * voidofp,
 
   for (y=0; y<totaly; y++) {
     bufpos=buffer + (totalx*3)*(totaly-y-1);
-    filepos=18 + iwidth*3*(iheight - starty - totaly + y + 1) + (startx - 1)*3; 
+    filepos=18 + iwidth*3*(iheight - starty - totaly + y + 1) + (startx - 1)*3;
 
     if (filepos >= 18) {
       fseek(ofp, filepos, 0); 
@@ -149,7 +140,7 @@ void writetgaregion(void * voidofp,
 
       if (numbytes != totalx) {
         char msgtxt[256];
-	sprintf(msgtxt, "File write problem, %d bytes written.", numbytes);  
+        sprintf(msgtxt, "File write problem, %d bytes written.", (int)numbytes);
         rt_ui_message(MSG_ERR, msgtxt);
       }
     }
@@ -163,7 +154,8 @@ void writetgaregion(void * voidofp,
 
 int readtga(char * name, int * xres, int * yres, unsigned char **imgdata) {
   int format, width, height, w1, w2, h1, h2, depth, flags;
-  int imgsize, bytesread, i, tmp;
+  int imgsize, i, tmp;
+  size_t bytesread;
   FILE * ifp;
 
   ifp=fopen(name, "r");  
@@ -226,7 +218,7 @@ int readtga(char * name, int * xres, int * yres, unsigned char **imgdata) {
   for (i=0; i<imgsize; i+=3) {
     tmp = (*imgdata)[i]; /* Blue */
     (*imgdata)[i] = (*imgdata)[i+2]; /* Red */
-    (*imgdata)[i+2] = tmp; /* Blue */    
+    (*imgdata)[i+2] = tmp; /* Blue */
   }
 
   *xres = width;

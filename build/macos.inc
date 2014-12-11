@@ -1,28 +1,20 @@
-# Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
-# This file is part of Threading Building Blocks.
+# This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+# you can redistribute it and/or modify it under the terms of the GNU General Public License
+# version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+# distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See  the GNU General Public License for more details.   You should have received a copy of
+# the  GNU General Public License along with Threading Building Blocks; if not, write to the
+# Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 #
-# Threading Building Blocks is free software; you can redistribute it
-# and/or modify it under the terms of the GNU General Public License
-# version 2 as published by the Free Software Foundation.
-#
-# Threading Building Blocks is distributed in the hope that it will be
-# useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Threading Building Blocks; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-#
-# As a special exception, you may use this file as part of a free software
-# library without restriction.  Specifically, if other files instantiate
-# templates or use macros or inline functions from this file, or you compile
-# this file and link it with other files to produce an executable, this
-# file does not by itself cause the resulting executable to be covered by
-# the GNU General Public License.  This exception does not however
-# invalidate any other reasons why the executable file might be covered by
-# the GNU General Public License.
+# As a special exception,  you may use this file  as part of a free software library without
+# restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+# functions from this file, or you compile this file and link it with other files to produce
+# an executable,  this file does not by itself cause the resulting executable to be covered
+# by the GNU General Public License. This exception does not however invalidate any other
+# reasons why the executable file might be covered by the GNU General Public License.
 
 ####### Detections and Commands ###############################################
 
@@ -59,22 +51,23 @@ ifeq (ios,$(target))
   ifneq (armv7, $(arch))
     $(error $(arch) not supported for target 'ios')
   endif
-  SDKROOT?=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)
+  export SDKROOT?=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)
   ifeq (,$(SDKROOT))
     $(error iOS SDK not found)
   endif
   # next, use a single compiler include file for both iOS* and OS X* builds.
   override target:=macos
+  export target
 endif
 
 ifndef runtime
- gcc_version = $(shell gcc -dumpversion)
+ gcc_version:=$(shell gcc -dumpversion)
  os_version:=$(shell /usr/bin/sw_vers -productVersion)
  export runtime:=cc$(gcc_version)_os$(os_version)
 endif
 
-native_compiler := gcc
-export compiler ?= gcc
+native_compiler := clang
+export compiler ?= clang
 debugger ?= gdb
 
 CMD=$(SHELL) -c
@@ -84,7 +77,7 @@ RD?=rmdir
 MD?=mkdir -p
 NUL= /dev/null
 SLASH=/
-MAKE_VERSIONS=sh $(tbb_root)/build/version_info_macos.sh $(CPLUS) $(CPLUS_FLAGS) $(INCLUDES) >version_string.ver
+MAKE_VERSIONS=sh $(tbb_root)/build/version_info_macos.sh $(VERSION_FLAGS) >version_string.ver
 MAKE_TBBVARS=sh $(tbb_root)/build/generate_tbbvars.sh DY
 
 ifdef DYLD_LIBRARY_PATH
@@ -97,6 +90,7 @@ endif
 
 OBJ=o
 DLL=dylib
+MALLOC_DLL?=$(DLL)
 LIBEXT=dylib
 
 def_prefix = $(if $(findstring 64,$(arch)),mac64,mac32)
@@ -108,10 +102,12 @@ TBB.LIB = $(TBB.DLL)
 LINK_TBB.LIB = $(TBB.LIB)
 
 MALLOC.DEF = $(MALLOC_ROOT)/$(def_prefix)-tbbmalloc-export.def
-MALLOC.DLL = libtbbmalloc$(DEBUG_SUFFIX).$(DLL)
+MALLOC.DLL = libtbbmalloc$(DEBUG_SUFFIX).$(MALLOC_DLL)
 MALLOC.LIB = $(MALLOC.DLL)
 LINK_MALLOC.LIB = $(MALLOC.LIB)
 
-TBB_NOSTRICT=1
+MALLOCPROXY.DLL = libtbbmalloc_proxy$(DEBUG_SUFFIX).$(MALLOC_DLL)
+MALLOCPROXY.LIB = $(MALLOCPROXY.DLL)
+LINK_MALLOCPROXY.LIB = $(MALLOCPROXY.LIB)
 
 TEST_LAUNCHER=sh $(tbb_root)/build/test_launcher.sh $(largs)

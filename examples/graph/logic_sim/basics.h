@@ -1,35 +1,25 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef __TBBexample_graph_logicsim_basics_H
 #define __TBBexample_graph_logicsim_basics_H 1
-
-#define TBB_PREVIEW_GRAPH_NODES 1
 
 #include <cstdio>
 #include <string>
@@ -59,43 +49,43 @@ void rt_sleep(int msec) {
 }
 #endif  /*  _WIN32  */
 
-
 using namespace std;
 using namespace tbb;
 using namespace tbb::flow;
 
 typedef enum { low=0, high, undefined } signal_t;
 
-typedef tuple<signal_t> one_input;
-typedef tuple<signal_t, signal_t> two_input;
-typedef tuple<signal_t, signal_t, signal_t> three_input;
-typedef tuple<signal_t, signal_t, signal_t, signal_t> four_input;
+template<int N> class gate;
 
-template <int N>
-struct gate_helper {
-    template <typename TupleType>
-    static inline receiver<signal_t>& get_inport(or_node<TupleType>& in_ports, int port) {
-        if (N-1 == port) return input_port<N-1>(in_ports);
-        else return gate_helper<N-1>::get_inport(in_ports, port);
-    }
-};
-template <>
-struct gate_helper<1> {
-    template <typename TupleType>
-    static inline receiver<signal_t>& get_inport(or_node<TupleType>& in_ports, int port) {
-        return input_port<0>(in_ports);
-    }
-};
-
-template <typename GateInput>
-class gate {
+template<>
+class gate<1> {
 protected:
-    typedef or_node<GateInput> input_port_t;
-    typedef multifunction_node< typename input_port_t::output_type, tuple<signal_t> > gate_fn_t;
-    typedef typename gate_fn_t::output_ports_type ports_type;
+    typedef indexer_node<signal_t> input_port_t;
+    typedef multifunction_node< input_port_t::output_type, tuple<signal_t> > gate_fn_t;
+    typedef gate_fn_t::output_ports_type ports_type;
 public:
-    static const int N = tbb::flow::tuple_size<GateInput>::value;
+    template <typename Body>
+    gate(graph& g, Body b) : my_graph(g), in_ports(g), gate_fn(g, 1, b) {
+        make_edge(in_ports, gate_fn);
+    }
+    virtual ~gate() {}
+    gate& operator=(const gate& src) { return *this; }
+    sender<signal_t>& get_out() { return output_port<0>(gate_fn); }
+    receiver<signal_t>& get_in(size_t port) { return input_port<0>(in_ports);} 
+protected:
+    graph& my_graph;
+private:
+    input_port_t in_ports;
+    gate_fn_t gate_fn;
+};
 
+template<>
+class gate<2> {
+protected:
+    typedef indexer_node<signal_t, signal_t> input_port_t;
+    typedef multifunction_node< input_port_t::output_type, tuple<signal_t> > gate_fn_t;
+    typedef gate_fn_t::output_ports_type ports_type;
+public:
     template <typename Body>
     gate(graph& g, Body b) : my_graph(g), in_ports(g), gate_fn(g, 1, b) {
         make_edge(in_ports, gate_fn);
@@ -104,7 +94,8 @@ public:
     gate& operator=(const gate& src) { return *this; }
     sender<signal_t>& get_out() { return output_port<0>(gate_fn); }
     receiver<signal_t>& get_in(size_t port) {
-        return gate_helper<N>::get_inport(in_ports, (int)port);
+        if (port == 0) return input_port<0>(in_ports);
+        else return input_port<1>(in_ports);
     }
 protected:
     graph& my_graph;
@@ -113,21 +104,57 @@ private:
     gate_fn_t gate_fn;
 };
 
-
-template <int N>
-struct or_output_helper {
-    template <typename OrOutputType>
-    static inline signal_t get_or_output(const OrOutputType& out) {
-        if (N-1 == out.indx) return tbb::flow::get<N-1>(out.result);
-        else return or_output_helper<N-1>::get_or_output(out);
+template<>
+class gate<3> {
+protected:
+    typedef indexer_node<signal_t, signal_t, signal_t> input_port_t;
+    typedef multifunction_node< input_port_t::output_type, tuple<signal_t> > gate_fn_t;
+    typedef gate_fn_t::output_ports_type ports_type;
+public:
+    template <typename Body>
+    gate(graph& g, Body b) : my_graph(g), in_ports(g), gate_fn(g, 1, b) {
+        make_edge(in_ports, gate_fn);
     }
+    virtual ~gate() {}
+    gate& operator=(const gate& src) { return *this; }
+    sender<signal_t>& get_out() { return output_port<0>(gate_fn); }
+    receiver<signal_t>& get_in(size_t port) {
+        if (port == 0) return input_port<0>(in_ports);
+        else if (port==1) return input_port<1>(in_ports);
+        else return input_port<2>(in_ports);
+    }
+protected:
+    graph& my_graph;
+private:
+    input_port_t in_ports;
+    gate_fn_t gate_fn;
 };
-template <>
-struct or_output_helper<1> {
-    template <typename OrOutputType>
-    static inline signal_t get_or_output(const OrOutputType& out) {
-        return tbb::flow::get<0>(out.result);
+
+template<>
+class gate<4> {
+protected:
+    typedef indexer_node<signal_t, signal_t, signal_t, signal_t> input_port_t;
+    typedef multifunction_node< input_port_t::output_type, tuple<signal_t> > gate_fn_t;
+    typedef gate_fn_t::output_ports_type ports_type;
+public:
+    template <typename Body>
+    gate(graph& g, Body b) : my_graph(g), in_ports(g), gate_fn(g, 1, b) {
+        make_edge(in_ports, gate_fn);
     }
+    virtual ~gate() {}
+    gate& operator=(const gate& src) { return *this; }
+    sender<signal_t>& get_out() { return output_port<0>(gate_fn); }
+    receiver<signal_t>& get_in(size_t port) {
+        if (port == 0) return input_port<0>(in_ports);
+        else if (port==1) return input_port<1>(in_ports);
+        else if (port==2) return input_port<2>(in_ports);
+        else return input_port<3>(in_ports);
+    }
+protected:
+    graph& my_graph;
+private:
+    input_port_t in_ports;
+    gate_fn_t gate_fn;
 };
 
 // Input devices
@@ -233,39 +260,39 @@ class toggle {
 };
 
 // Basic gates
-class buffer : public gate<one_input> {
-    using gate<one_input>::my_graph;
-    typedef gate<one_input>::ports_type ports_type;
+class buffer : public gate<1> {
+    using gate<1>::my_graph;
+    typedef gate<1>::ports_type ports_type;
     class buffer_body {
         signal_t state;
         bool touched;
     public:
         buffer_body() : state(undefined), touched(false) {}
         void operator()(const input_port_t::output_type &v, ports_type& p) { 
-            if (!touched || state != tbb::flow::get<0>(v.result)) {
-                state = tbb::flow::get<0>(v.result); 
+            if (!touched || state != cast_to<signal_t>(v)) {
+                state = cast_to<signal_t>(v); 
                 tbb::flow::get<0>(p).try_put(state); 
                 touched = true;
             }
         }
     };
 public: 
-    buffer(graph& g) : gate<one_input>(g, buffer_body()) {}
-    buffer(const buffer& src) : gate<one_input>(src.my_graph, buffer_body()) {}
+    buffer(graph& g) : gate<1>(g, buffer_body()) {}
+    buffer(const buffer& src) : gate<1>(src.my_graph, buffer_body()) {}
     ~buffer() {}
 };
 
-class not_gate : public gate<one_input> {
-    using gate<one_input>::my_graph;
-    typedef gate<one_input>::ports_type ports_type;
+class not_gate : public gate<1> {
+    using gate<1>::my_graph;
+    typedef gate<1>::ports_type ports_type;
     class not_body {
         signal_t port;
         bool touched;
     public:
     not_body() : port(undefined), touched(false) {}
         void operator()(const input_port_t::output_type &v, ports_type& p) {
-            if (!touched || port != tbb::flow::get<0>(v.result)) {
-                port = tbb::flow::get<0>(v.result);
+            if (!touched || port != cast_to<signal_t>(v)) {
+                port = cast_to<signal_t>(v); 
                 signal_t state = low;
                 if (port==low) state = high; 
                 tbb::flow::get<0>(p).try_put(state);
@@ -274,18 +301,16 @@ class not_gate : public gate<one_input> {
         }
     };
  public: 
-    not_gate(graph& g) : gate<one_input>(g, not_body()) {}
-    not_gate(const not_gate& src) : gate<one_input>(src.my_graph, not_body()) {}
+    not_gate(graph& g) : gate<1>(g, not_body()) {}
+    not_gate(const not_gate& src) : gate<1>(src.my_graph, not_body()) {}
     ~not_gate() {}
 };
 
-template <typename GateInput>
-class and_gate : public gate<GateInput> {
-    using gate<GateInput>::N;
-    using gate<GateInput>::my_graph;
-    typedef typename gate<GateInput>::ports_type ports_type;
-    typedef typename gate<GateInput>::input_port_t::output_type from_input;
-    typedef or_output_helper< gate<GateInput>::N > or_output;
+template <int N>
+class and_gate : public gate<N> {
+    using gate<N>::my_graph;
+    typedef typename gate<N>::ports_type ports_type;
+    typedef typename gate<N>::input_port_t::output_type from_input;
     class and_body {
         signal_t *ports;
         signal_t state;
@@ -296,7 +321,7 @@ class and_gate : public gate<GateInput> {
             for (int i=0; i<N; ++i) ports[i] = undefined;
         }
         void operator()(const from_input& v, ports_type& p) {
-            ports[v.indx] = or_output::get_or_output(v);
+            ports[v.tag()] = cast_to<signal_t>(v);
             signal_t new_state=high;
             size_t i=0;
             while (i<N) {
@@ -312,18 +337,16 @@ class and_gate : public gate<GateInput> {
         }
     };
  public:
-    and_gate(graph& g) : gate<GateInput>(g, and_body()) {}
-    and_gate(const and_gate<GateInput>& src) : gate<GateInput>(src.my_graph, and_body()) {}
+    and_gate(graph& g) : gate<N>(g, and_body()) {}
+    and_gate(const and_gate<N>& src) : gate<N>(src.my_graph, and_body()) {}
     ~and_gate() {}
 };
 
-template <typename GateInput>
-class or_gate : public gate<GateInput> {
-    using gate<GateInput>::N;
-    using gate<GateInput>::my_graph;
-    typedef typename gate<GateInput>::ports_type ports_type;
-    typedef typename gate<GateInput>::input_port_t::output_type from_input;
-    typedef or_output_helper< gate<GateInput>::N > or_output;
+template<int N>
+class or_gate : public gate<N> {
+    using gate<N>::my_graph;
+    typedef typename gate<N>::ports_type ports_type;
+    typedef typename gate<N>::input_port_t::output_type from_input;
     class or_body {
         signal_t *ports;
         signal_t state;
@@ -334,7 +357,7 @@ class or_gate : public gate<GateInput> {
             for (int i=0; i<N; ++i) ports[i] = undefined;
         }
         void operator()(const from_input& v, ports_type& p) {
-            ports[v.indx] = or_output::get_or_output(v);
+            ports[v.tag()] = cast_to<signal_t>(v);
             signal_t new_state=low;
             size_t i=0;
             while (i<N) {
@@ -350,18 +373,16 @@ class or_gate : public gate<GateInput> {
         }
     };
 public:
-    or_gate(graph& g) : gate<GateInput>(g, or_body()) {}
-    or_gate(const or_gate& src) : gate<GateInput>(src.my_graph, or_body()) {}
+    or_gate(graph& g) : gate<N>(g, or_body()) {}
+    or_gate(const or_gate& src) : gate<N>(src.my_graph, or_body()) {}
     ~or_gate() {}
 };
 
-template <typename GateInput>
-class xor_gate : public gate<GateInput> {
-    using gate<GateInput>::N;
-    using gate<GateInput>::my_graph;
-    typedef typename gate<GateInput>::ports_type ports_type;
-    typedef typename gate<GateInput>::input_port_t input_port_t;
-    typedef or_output_helper< gate<GateInput>::N > or_output;
+template <int N>
+class xor_gate : public gate<N> {
+    using gate<N>::my_graph;
+    typedef typename gate<N>::ports_type ports_type;
+    typedef typename gate<N>::input_port_t input_port_t;
     class xor_body {
         signal_t *ports;
         signal_t state;
@@ -372,7 +393,7 @@ class xor_gate : public gate<GateInput> {
             for (int i=0; i<N; ++i) ports[i] = undefined;
         }
         void operator()(const typename input_port_t::output_type &v, ports_type& p) {
-            ports[v.indx] = or_output::get_or_output(v);
+            ports[v.tag()] = cast_to<signal_t>(v);
             signal_t new_state=low;
             size_t i=0, highs=0;
             while (i<N) {
@@ -390,18 +411,16 @@ class xor_gate : public gate<GateInput> {
         }
     };
  public:
-    xor_gate(graph& g) : gate<GateInput>(g, xor_body()) {}
-    xor_gate(const xor_gate& src) : gate<GateInput>(src.my_graph, xor_body()) {}
+    xor_gate(graph& g) : gate<N>(g, xor_body()) {}
+    xor_gate(const xor_gate& src) : gate<N>(src.my_graph, xor_body()) {}
     ~xor_gate() {}
 };
 
-template <typename GateInput>
-class nor_gate : public gate<GateInput> {
-    using gate<GateInput>::N;
-    using gate<GateInput>::my_graph;
-    typedef typename gate<GateInput>::ports_type ports_type;
-    typedef typename gate<GateInput>::input_port_t input_port_t;
-    typedef or_output_helper< gate<GateInput>::N > or_output;
+template <int N>
+class nor_gate : public gate<N> {
+    using gate<N>::my_graph;
+    typedef typename gate<N>::ports_type ports_type;
+    typedef typename gate<N>::input_port_t input_port_t;
     class nor_body {
         signal_t *ports;
         signal_t state;
@@ -412,7 +431,7 @@ class nor_gate : public gate<GateInput> {
             for (int i=0; i<N; ++i) ports[i] = undefined;
         }
         void operator()(const typename input_port_t::output_type &v, ports_type& p) {
-            ports[v.indx] = or_output::get_or_output(v);
+            ports[v.tag()] = cast_to<signal_t>(v);
             signal_t new_state=low;
             size_t i=0;
             while (i<N) {
@@ -430,8 +449,8 @@ class nor_gate : public gate<GateInput> {
         }
     };
  public:
-    nor_gate(graph& g) : gate<GateInput>(g, nor_body()) {}
-    nor_gate(const nor_gate& src) : gate<GateInput>(src.my_graph, nor_body()) {}
+    nor_gate(graph& g) : gate<N>(g, nor_body()) {}
+    nor_gate(const nor_gate& src) : gate<N>(src.my_graph, nor_body()) {}
     ~nor_gate() {}
 };
 
@@ -488,12 +507,13 @@ class led {
     signal_t get_value() { return state; }
 };
 
-class digit : public gate<four_input> {
-    using gate<four_input>::my_graph;
-    typedef gate<four_input>::ports_type ports_type;
-    typedef gate<four_input>::input_port_t input_port_t;
+class digit : public gate<4> {
+    using gate<4>::my_graph;
+    typedef gate<4>::ports_type ports_type;
+    typedef gate<4>::input_port_t input_port_t;
     class digit_body {
         signal_t ports[4];
+        static const int N = 4;
         unsigned int &state;
         string &label;
         bool& report_changes;
@@ -503,10 +523,7 @@ class digit : public gate<four_input> {
         }
         void operator()(const input_port_t::output_type& v, ports_type& p) {
             unsigned int new_state = 0;
-            if (v.indx == 0) ports[0] = tbb::flow::get<0>(v.result);
-            else if (v.indx == 1) ports[1] = tbb::flow::get<1>(v.result);
-            else if (v.indx == 2) ports[2] = tbb::flow::get<2>(v.result);
-            else if (v.indx == 3) ports[3] = tbb::flow::get<3>(v.result);
+            ports[v.tag()] = cast_to<signal_t>(v);
             if (ports[0] == high) ++new_state;
             if (ports[1] == high) new_state += 2;
             if (ports[2] == high) new_state += 4;
@@ -524,10 +541,10 @@ class digit : public gate<four_input> {
     bool report_changes;
  public:
     digit(graph& g, string l, bool rc=false) : 
-        gate<four_input>(g, digit_body(state, label, report_changes)), 
+        gate<4>(g, digit_body(state, label, report_changes)), 
         label(l), state(0), report_changes(rc) {}
     digit(const digit& src) : 
-        gate<four_input>(src.my_graph, digit_body(state, label, report_changes)), 
+        gate<4>(src.my_graph, digit_body(state, label, report_changes)), 
         label(src.label), state(0), report_changes(src.report_changes) {}
     ~digit() {}
     // Assignment changes the behavior of LHS to that of the RHS, but doesn't change owning graph.

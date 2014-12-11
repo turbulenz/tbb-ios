@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #include "harness_defs.h"
@@ -178,7 +170,7 @@ public:
 
     void Run ( uint_t idx ) {
 #if TBBTEST_USE_TBB
-        tbb::task_scheduler_init init;
+        tbb::task_scheduler_init init(g_MaxConcurrency);
 #endif
         AssertLive();
         if ( idx == 0 ) {
@@ -430,11 +422,15 @@ void TestTaskHandle2 () {
     FIB_TEST_PROLOGUE();
     g_Sum = 0;
     task_group_type rg;
-    const unsigned hSize = sizeof(handle_type);
-    char *handles = new char [numRepeats * hSize];
+    typedef tbb::aligned_space<handle_type> handle_space_t;
+    handle_space_t *handles = new handle_space_t[numRepeats];
     handle_type *h = NULL;
-    for( unsigned i = 0; ; ++i ) {
-        h = tbb::internal::punned_cast<handle_type*,char>(handles + i * hSize);
+#if __TBB_ipf && __TBB_GCC_VERSION==40601
+    volatile // Workaround for unexpected exit from the loop below after the exception was caught
+#endif
+    unsigned i = 0;
+    for( ;; ++i ) {
+        h = handles[i].begin();
 #if __TBB_FUNC_PTR_AS_TEMPL_PARAM_BROKEN
         new ( h ) handle_type((void(*)())RunFib4<task_group_type>);
 #else
@@ -446,7 +442,8 @@ void TestTaskHandle2 () {
 #if TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN
         bool caught = false;
         try {
-            rg.run( *h );
+            if( i&1 ) rg.run( *h );
+            else rg.run_and_wait( *h );
         }
         catch ( Concurrency::invalid_multiple_scheduling& e ) {
             ASSERT( e.what(), "Error message is absent" );
@@ -458,12 +455,14 @@ void TestTaskHandle2 () {
         ASSERT ( caught, "Expected invalid_multiple_scheduling exception is missing" );
 #endif /* TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN */
     }
+    ASSERT( i == numRepeats - 1, "unexpected exit from the loop" );
     rg.run_and_wait( *h );
-    for( unsigned i = 0; i < numRepeats; ++i )
+
+    for( i = 0; i < numRepeats; ++i )
 #if __TBB_UNQUALIFIED_CALL_OF_DTOR_BROKEN
-        tbb::internal::punned_cast<handle_type*,char>(handles + i * hSize)->Concurrency::task_handle<void(*)()>::~task_handle();
+        handles[i].begin()->Concurrency::task_handle<void(*)()>::~task_handle();
 #else
-        tbb::internal::punned_cast<handle_type*,char>(handles + i * hSize)->~handle_type();
+        handles[i].begin()->~handle_type();
 #endif
     delete []handles;
     FIB_TEST_EPILOGUE(g_Sum);
@@ -842,14 +841,10 @@ int TestMain () {
         TestEh2();
         TestStructuredWait();
         TestStructuredCancellation2<true>();
-        //this condition can not be moved harness_defs.h as the only way to detect std C++ library is to include something from it.
-        //TODO: recheck the condition with newer versions of clang/libc++
-#if (__clang__ && _LIBCPP_VERSION && __GXX_EXPERIMENTAL_CXX0X__)
-        //TODO:it seems that clang with libc++ in C++11 mode does not expect exception
-        //coming from destructor in the following test as it does not generate correct code for stack unwinding.
-        REPORT("Known issue: TestStructuredCancellation2<false> test is skipped.\n");
-#else
+#if !__TBB_THROW_FROM_DTOR_BROKEN
         TestStructuredCancellation2<false>();
+#else
+        REPORT("Known issue: TestStructuredCancellation2<false>() is skipped.\n");
 #endif
 #endif /* TBB_USE_EXCEPTIONS && !__TBB_THROW_ACROSS_MODULE_BOUNDARY_BROKEN */
 #if !TBBTEST_USE_TBB

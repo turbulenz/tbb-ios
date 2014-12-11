@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #define TBB_PREVIEW_WAITING_FOR_WORKERS 1
@@ -32,7 +24,12 @@
 #include "tbb/cache_aligned_allocator.h"
 #include "tbb/parallel_for.h"
 
-#define HARNESS_NO_PARSE_COMMAND_LINE 1
+#define HARNESS_DEFAULT_MIN_THREADS (tbb::task_scheduler_init::default_num_threads())
+#define HARNESS_DEFAULT_MAX_THREADS (4*tbb::task_scheduler_init::default_num_threads())
+#if __bg__
+// CNK does not support fork()
+#define HARNESS_SKIP_TEST 1
+#endif
 #include "harness.h"
 
 #if _WIN32||_WIN64
@@ -101,14 +98,37 @@ public:
     AllocTask() {}
 };
 
+/* Regression test against data race between termination of workers
+   and setting blocking terination mode in main thread. */
+class RunWorkersBody : NoAssign {
+    bool wait_workers;
+public:
+    RunWorkersBody(bool waitWorkers) : wait_workers(waitWorkers) {}
+    void operator()(const int /*threadID*/) const {
+        tbb::task_scheduler_init sch(MaxThread, 0, wait_workers);
+            tbb::parallel_for(tbb::blocked_range<int>(0, 10000, 1), AllocTask(),
+                              tbb::simple_partitioner());
+    }
+};
+
+void TestBlockNonblock()
+{
+    for (int i=0; i<100; i++) {
+        NativeParallelFor(4, RunWorkersBody(/*wait_workers=*/false));
+        RunWorkersBody(/*wait_workers=*/true)(0);
+    }
+}
+
 int TestMain()
 {
     using namespace Harness;
 
+    TestBlockNonblock();
+
+    bool child = false;
 #if _WIN32||_WIN64
     DWORD masterTid = GetCurrentThreadId();
 #else
-    bool child = false;
     struct sigaction sa;
     sigset_t sig_set;
 
@@ -126,8 +146,10 @@ int TestMain()
     if (pthread_sigmask(SIG_BLOCK, &sig_set, NULL))
         ASSERT(0, "pthread_sigmask failed");
 #endif
-    for (int threads = 16; threads<=64; threads+=16) {
+    for (int threads=MinThread; threads<=MaxThread; threads+=MinThread) {
         for (int i=0; i<20; i++) {
+            if (!child)
+                REMARK("\rThreads %d %d ", threads, i);
             {
                 tbb::task_scheduler_init sch(threads, 0, /*wait_workers=*/true);
             }
@@ -188,7 +210,9 @@ int TestMain()
 #endif // _WIN32||_WIN64
         }
     }
+    REMARK("\n");
 #if TBB_USE_EXCEPTIONS
+    REMARK("Testing exceptions\n");
     try {
         {
             tbb::task_scheduler_init schBlock(2, 0, /*wait_workers=*/true);

@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 // Basic testing of an allocator
@@ -36,6 +28,9 @@
 // are supposed to work in the abscense of STL.
 
 #include "harness.h"
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    #include <utility> //for std::pair
+#endif
 
 template<typename A>
 struct is_zero_filling {
@@ -137,6 +132,22 @@ void TestBasic( A& a ) {
     a.destroy( p );
     ASSERT( NumberOfFoo==n, "destructor for Foo not called?" );
     a.deallocate(p,1);
+
+    #if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+    {
+        typedef typename A:: template rebind<std::pair<typename A::value_type, typename A::value_type> >::other pair_allocator_type;
+        pair_allocator_type pair_allocator(a);
+        int NumberOfFooBeforeConstruct= NumberOfFoo;
+        typename pair_allocator_type::pointer pair_pointer = pair_allocator.allocate(1);
+        pair_allocator.construct( pair_pointer, cx, cx);
+        ASSERT( NumberOfFoo==NumberOfFooBeforeConstruct+2, "constructor for Foo not called appropriate number of times?" );
+
+        pair_allocator.destroy( pair_pointer );
+        ASSERT( NumberOfFoo==NumberOfFooBeforeConstruct, "destructor for Foo not called appropriate number of times?" );
+        pair_allocator.deallocate(pair_pointer,1);
+    }
+    #endif
+
 }
 
 #include "tbb/blocked_range.h"
@@ -190,9 +201,6 @@ struct Body: NoAssign {
         for( size_t k=0; k<256; ++k )
             if(array[k])
                 check_deallocate(array, k, thread_id);
-#if __TBBMALLOC_CALL_THREAD_SHUTDOWN
-        __TBB_mallocThreadShutdownNotification();
-#endif
     }
 };
 

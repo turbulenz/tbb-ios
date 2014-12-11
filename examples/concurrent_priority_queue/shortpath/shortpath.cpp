@@ -1,34 +1,22 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
-
-// This header should come before any other one.
-// For details, see Known Issues in the Release Notes.
-#include "tbb/tbb_stddef.h"
 
 #include <cstdio>
 #include <vector>
@@ -106,7 +94,7 @@ size_t dst = N-1;              // end of path
 double INF=100000.0;           // infinity
 size_t grainsize = 16;         // number of vertices per task on average
 size_t max_spawn;              // max tasks to spawn
-atomic<size_t> num_spawn;      // number of active tasks
+tbb::atomic<size_t> num_spawn;      // number of active tasks
 
 point_set vertices;            // vertices
 edge_set edges;                // edges
@@ -114,7 +102,7 @@ vector<vertex_id> predecessor; // for recreating path from src to dst
 
 vector<double> f_distance;     // estimated distances at particular vertex
 vector<double> g_distance;     // current shortest distances from src vertex
-vector<spin_mutex> locks;      // a lock for each vertex
+spin_mutex    *locks;          // a lock for each vertex
 task_group *sp_group;          // task group for tasks executing sub-problems
 
 class compare_f {
@@ -137,6 +125,7 @@ public:
 #endif
 
 void shortpath() {
+    sp_group = new task_group;
     g_distance[src] = 0.0; // src's distance from src is zero
     f_distance[src] = get_distance(vertices[src], vertices[dst]); // estimate distance from src to dst
     open_set.push(make_pair(src,f_distance[src])); // push src into open_set
@@ -146,6 +135,7 @@ void shortpath() {
     sp_group->run( shortpath_helper_functor() );
 #endif
     sp_group->wait();
+    delete sp_group;
 }
 
 void shortpath_helper() {
@@ -268,14 +258,13 @@ public:
 #endif
 
 void InitializeGraph() {
-    sp_group = new task_group;
+    task_scheduler_init init(get_default_num_threads());
     vertices.resize(N);
     edges.resize(N);
     predecessor.resize(N);
     g_distance.resize(N);
     f_distance.resize(N);
-    locks.resize(N);
-    task_scheduler_init init(get_default_num_threads());
+    locks = new spin_mutex[N];
     if (verbose) printf("Generating vertices...\n");
 #if __TBB_LAMBDAS_PRESENT
     parallel_for(blocked_range<size_t>(0,N,64), 
@@ -310,6 +299,10 @@ void InitializeGraph() {
         }
     }
     if (verbose) printf("Done.\n");
+}
+
+void ReleaseGraph() {
+    delete []locks;
 }
 
 void ResetGraph() {
@@ -375,6 +368,7 @@ int main(int argc, char *argv[]) {
             } else
                 utility::report_elapsed_time((t1-t0).seconds());
         }
+        ReleaseGraph();
         return 0;
     } catch(std::exception& e) {
         cerr<<"error occurred. error text is :\"" <<e.what()<<"\"\n";

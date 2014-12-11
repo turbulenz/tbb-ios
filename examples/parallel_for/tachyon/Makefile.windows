@@ -1,28 +1,20 @@
-# Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 #
-# This file is part of Threading Building Blocks.
+# This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+# you can redistribute it and/or modify it under the terms of the GNU General Public License
+# version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+# distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See  the GNU General Public License for more details.   You should have received a copy of
+# the  GNU General Public License along with Threading Building Blocks; if not, write to the
+# Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 #
-# Threading Building Blocks is free software; you can redistribute it
-# and/or modify it under the terms of the GNU General Public License
-# version 2 as published by the Free Software Foundation.
-#
-# Threading Building Blocks is distributed in the hope that it will be
-# useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Threading Building Blocks; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-#
-# As a special exception, you may use this file as part of a free software
-# library without restriction.  Specifically, if other files instantiate
-# templates or use macros or inline functions from this file, or you compile
-# this file and link it with other files to produce an executable, this
-# file does not by itself cause the resulting executable to be covered by
-# the GNU General Public License.  This exception does not however
-# invalidate any other reasons why the executable file might be covered by
-# the GNU General Public License.
+# As a special exception,  you may use this file  as part of a free software library without
+# restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+# functions from this file, or you compile this file and link it with other files to produce
+# an executable,  this file does not by itself cause the resulting executable to be covered
+# by the GNU General Public License. This exception does not however invalidate any other
+# reasons why the executable file might be covered by the GNU General Public License.
 
 # The original source for this example is
 # Copyright (c) 1994-2008 John E. Stone
@@ -86,7 +78,9 @@ LIBS_TBB_DEBUG =  tbb_debug.lib $(LIBS)
 
 
 MAKEINC = ../../common/gui/Makefile.win
-SOURCE = src/main.cpp src/pthread.cpp src/tachyon_video.cpp src/api.cpp src/apigeom.cpp src/apitrigeom.cpp src/bndbox.cpp src/box.cpp src/camera.cpp src/coordsys.cpp src/cylinder.cpp src/extvol.cpp src/global.cpp src/grid.cpp src/imageio.cpp src/imap.cpp src/intersect.cpp src/jpeg.cpp src/light.cpp src/objbound.cpp src/parse.cpp src/plane.cpp src/ppm.cpp src/quadric.cpp src/render.cpp src/ring.cpp src/shade.cpp src/sphere.cpp src/texture.cpp src/tgafile.cpp src/trace_rest.cpp src/triangle.cpp src/ui.cpp src/util.cpp src/vector.cpp src/vol.cpp
+# scr/main.cpp src/tachyon_video.cpp cannot be included to the SOURCE_COMMON list since it depends on UI and /subsystem which is not specified for common SOURCE build
+SOURCE = src/main.cpp src/tachyon_video.cpp
+SOURCE_COMMON = src/pthread.cpp  src/api.cpp src/apigeom.cpp src/apitrigeom.cpp src/bndbox.cpp src/box.cpp src/camera.cpp src/coordsys.cpp src/cylinder.cpp src/extvol.cpp src/global.cpp src/grid.cpp src/imageio.cpp src/imap.cpp src/intersect.cpp src/jpeg.cpp src/light.cpp src/objbound.cpp src/parse.cpp src/plane.cpp src/ppm.cpp src/quadric.cpp src/render.cpp src/ring.cpp src/shade.cpp src/sphere.cpp src/texture.cpp src/tgafile.cpp src/trace_rest.cpp src/triangle.cpp src/ui.cpp src/util.cpp src/vector.cpp src/vol.cpp
 
 # Targets
 all: build run
@@ -105,33 +99,50 @@ tbb_debug: build_tbb_debug run_tbb
 tbb1d: build_tbb1d run_tbb1d
 tbb1d_debug: build_tbb1d_debug run_tbb1d
 
-build_serial:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.serial.cpp $(SOURCE)" EXE=tachyon.serial.exe RCNAME=gui UI=$(UI) CXX="$(CXX)" CXXFLAGS=$(CXXFLAGS) XARCH=$(XARCH) build_one
-build_serial_debug:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.serial.cpp $(SOURCE)" EXE=tachyon.serial.exe RCNAME=gui UI=$(UI) DEBUG=_debug CXX="$(CXX)" CXXFLAGS=$(CXXFLAGS) XARCH=$(XARCH) build_one
+CXXFLAGS_COMMON = /c /nologo /EHsc /Zc:forScope /D WIN32 /D _MBCS /D _CRT_SECURE_NO_DEPRECATE /Foobj/ /MP $(CXXFLAGS)
+CXXFLAGS_NDEBUG = /MD /O2 /Ot /Gy /D NDEBUG
+CXXFLAGS_DEBUG = /MDd /Od /Zi /D _DEBUG
+LIB_LINK_FLAGS = /nologo /machine:$(XARCH)
+
+tachyon_common.lib:
+	@cmd.exe /C if not exist obj mkdir obj
+	$(CXX) $(CXXFLAGS_NDEBUG) $(CXXFLAGS_COMMON) $(SOURCE_COMMON)
+	LIB $(LIB_LINK_FLAGS) obj/*.obj /OUT:$@
+	@cmd.exe /C if exist obj rmdir /S /Q obj
+
+tachyon_common_debug.lib:
+	@cmd.exe /C if not exist obj mkdir obj
+	$(CXX) $(CXXFLAGS_DEBUG) $(CXXFLAGS_COMMON) $(SOURCE_COMMON)
+	LIB $(LIB_LINK_FLAGS) obj/*.obj /OUT:$@
+	@cmd.exe /C if exist obj rmdir /S /Q obj
+
+build_serial: tachyon_common.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.serial.cpp $(SOURCE) tachyon_common.lib" EXE=tachyon.serial.exe RCNAME=gui UI=$(UI) CXX="$(CXX)" CXXFLAGS="/GL $(CXXFLAGS)" XARCH=$(XARCH) build_one
+build_serial_debug: tachyon_common_debug.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.serial.cpp $(SOURCE) tachyon_common_debug.lib" EXE=tachyon.serial.exe RCNAME=gui UI=$(UI) DEBUG=_debug CXX="$(CXX)" CXXFLAGS=$(CXXFLAGS) XARCH=$(XARCH) build_one
 run_serial:
 	-.\tachyon.serial.exe $(ARGS)
 
-build_tbb:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb.cpp $(SOURCE)" EXE=tachyon.tbb.exe RCNAME=gui UI=$(UI) CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_NDEBUG)" LFLAGS="$(LIBS_TBB_NDEBUG)" XARCH=$(XARCH) build_one
-build_tbb_debug:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb.cpp $(SOURCE)" EXE=tachyon.tbb.exe RCNAME=gui UI=$(UI) DEBUG=_debug CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_DEBUG)" LFLAGS="$(LIBS_TBB_DEBUG)" XARCH=$(XARCH) build_one
+build_tbb: tachyon_common.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb.cpp $(SOURCE) tachyon_common.lib" EXE=tachyon.tbb.exe RCNAME=gui UI=$(UI) CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_NDEBUG)" LFLAGS="$(LIBS_TBB_NDEBUG)" XARCH=$(XARCH) build_one
+build_tbb_debug: tachyon_common_debug.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb.cpp $(SOURCE) tachyon_common_debug.lib" EXE=tachyon.tbb.exe RCNAME=gui UI=$(UI) DEBUG=_debug CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_DEBUG)" LFLAGS="$(LIBS_TBB_DEBUG)" XARCH=$(XARCH) build_one
 run_tbb:
 	-.\tachyon.tbb.exe $(ARGS)
 
-build_tbb1d:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb1d.cpp $(SOURCE)" EXE=tachyon.tbb1d.exe RCNAME=gui UI=$(UI) CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_NDEBUG)" LFLAGS="$(LIBS_TBB_NDEBUG)" XARCH=$(XARCH) build_one
-build_tbb1d_debug:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb1d.cpp $(SOURCE)" EXE=tachyon.tbb1d.exe RCNAME=gui UI=$(UI) DEBUG=_debug CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_DEBUG)" LFLAGS="$(LIBS_TBB_DEBUG)" XARCH=$(XARCH) build_one
+build_tbb1d: tachyon_common.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb1d.cpp $(SOURCE) tachyon_common.lib" EXE=tachyon.tbb1d.exe RCNAME=gui UI=$(UI) CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_NDEBUG)" LFLAGS="$(LIBS_TBB_NDEBUG)" XARCH=$(XARCH) build_one
+build_tbb1d_debug: tachyon_common_debug.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb1d.cpp $(SOURCE) tachyon_common_debug.lib" EXE=tachyon.tbb1d.exe RCNAME=gui UI=$(UI) DEBUG=_debug CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_DEBUG)" LFLAGS="$(LIBS_TBB_DEBUG)" XARCH=$(XARCH) build_one
 run_tbb1d:
 	-.\tachyon.tbb1d.exe $(ARGS)
 
 
 clean:
-	@cmd.exe /C del tachyon.* *.manifest *.obj msvs\gui.res *.?db
+	@cmd.exe /C del tachyon.* *.manifest *.obj *.lib msvs\gui.res *.?db
 
-perf_build:
-	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb.cpp $(SOURCE)" EXE=tachyon.tbb.exe RCNAME=gui UI=con CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_NDEBUG)" LFLAGS="$(LIBS_TBB_NDEBUG)" XARCH=$(XARCH) build_one
+perf_build: tachyon_common.lib
+	@$(MAKE) -f $(MAKEINC) SOURCE="src/trace.tbb.cpp $(SOURCE) tachyon_common.lib" EXE=tachyon.tbb.exe RCNAME=gui UI=con CXX="$(CXX)" CXXFLAGS="$(CXXFLAGS_TBB_NDEBUG)" LFLAGS="$(LIBS_TBB_NDEBUG)" XARCH=$(XARCH) build_one
 perf_run:
 	-.\tachyon.tbb.exe $(PERF_RUN_ARGS)
 

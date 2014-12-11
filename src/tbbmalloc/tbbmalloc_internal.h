@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef __TBB_tbbmalloc_internal_H
@@ -43,7 +35,7 @@
     #error Must define USE_PTHREAD or USE_WINTHREAD
 #endif
 
-#include "tbb/tbb_config.h"
+#include "tbb/tbb_config.h" // for __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
 #if __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
   #define _EXCEPTION_PTR_H /* prevents exception_ptr.h inclusion */
   #define _GLIBCXX_NESTED_EXCEPTION_H /* prevents nested_exception.h inclusion */
@@ -58,10 +50,6 @@
 #endif
 #include "tbb/scalable_allocator.h"
 #include "tbbmalloc_internal_api.h"
-
-#if __sun || __SUNPRO_CC
-#define __asm__ asm
-#endif
 
 /********* Various compile-time options        **************/
 
@@ -80,6 +68,10 @@
 #define ASSERT_TEXT NULL
 
 #define COLLECT_STATISTICS ( MALLOC_DEBUG && MALLOCENV_COLLECT_STATISTICS )
+#ifndef USE_INTERNAL_TID
+#define USE_INTERNAL_TID COLLECT_STATISTICS
+#endif
+
 #include "Statistics.h"
 
 // call yield for whitebox testing, skip in real library
@@ -145,6 +137,7 @@ class FreeBlock;
 class TLSData;
 class Backend;
 class MemoryPool;
+struct CacheBinOperation;
 extern const uint32_t minLargeObjectSize;
 
 class TLSKey {
@@ -157,11 +150,25 @@ public:
     TLSData* createTLS(MemoryPool *memPool, Backend *backend);
 };
 
+template<typename Arg, typename Compare>
+inline void AtomicUpdate(Arg &location, Arg newVal, const Compare &cmp)
+{
+    MALLOC_STATIC_ASSERT(sizeof(Arg) == sizeof(intptr_t),
+                         "Type of argument must match AtomicCompareExchange type.");
+    for (Arg old = location; cmp(old, newVal); ) {
+        Arg val = AtomicCompareExchange((intptr_t&)location, (intptr_t)newVal, old);
+        if (val == old)
+            break;
+        // TODO: do we need backoff after unsuccessful CAS?
+        old = val;
+    }
+}
+
 // TODO: make BitMaskBasic more general
-// (currenty, it fits BitMaskMin well, but not as suitable for BitMaskMax)
+// (currently, it fits BitMaskMin well, but not as suitable for BitMaskMax)
 template<unsigned NUM>
 class BitMaskBasic {
-    static const int SZ = (NUM-1)/(CHAR_BIT*sizeof(uintptr_t))+1;
+    static const unsigned SZ = (NUM-1)/(CHAR_BIT*sizeof(uintptr_t))+1;
     static const unsigned WORD_LEN = CHAR_BIT*sizeof(uintptr_t);
     uintptr_t mask[SZ];
 protected:
@@ -176,24 +183,25 @@ protected:
             AtomicAnd(&mask[i], ~(1ULL << pos));
     }
     int getMinTrue(unsigned startIdx) const {
-        size_t idx = startIdx / WORD_LEN;
-        uintptr_t curr;
+        unsigned idx = startIdx / WORD_LEN;
         int pos;
 
-        if (startIdx % WORD_LEN) { // clear bits before startIdx
+        if (startIdx % WORD_LEN) {
+            // only interested in part of a word, clear bits before startIdx
             pos = WORD_LEN - startIdx % WORD_LEN;
-            curr = mask[idx] & ((1ULL<<pos) - 1);
-        } else
-            curr = mask[idx];
-
-        for (int i=idx; i<SZ; i++, curr=mask[i]) {
-            if (-1 != (pos = BitScanRev(curr)))
-                return (i+1)*WORD_LEN - pos - 1;
+            uintptr_t actualMask = mask[idx] & (((uintptr_t)1<<pos) - 1);
+            idx++;
+            if (-1 != (pos = BitScanRev(actualMask)))
+                return idx*WORD_LEN - pos - 1;
         }
+
+        while (idx<SZ)
+            if (-1 != (pos = BitScanRev(mask[idx++])))
+                return idx*WORD_LEN - pos - 1;
         return -1;
     }
 public:
-    void reset() { for (int i=0; i<SZ; i++) mask[i] = 0; }
+    void reset() { for (unsigned i=0; i<SZ; i++) mask[i] = 0; }
 };
 
 template<unsigned NUM>
@@ -217,6 +225,26 @@ public:
     }
 };
 
+
+// The part of thread-specific data that can be modified by other threads.
+// Such modifications must be protected by AllLocalCaches::listLock.
+struct TLSRemote {
+    TLSRemote *next,
+              *prev;
+};
+
+// The list of all thread-local data; supporting cleanup of thread caches
+class AllLocalCaches {
+    TLSRemote  *head;
+    MallocMutex listLock; // protects operations in the list
+public:
+    void registerThread(TLSRemote *tls);
+    void unregisterThread(TLSRemote *tls);
+    bool cleanup(ExtMemoryPool *extPool, bool cleanOnlyUnused);
+    void markUnused();
+    void reset() { head = NULL; }
+};
+
 /* cache blocks in range [MinSize; MaxSize) in bins with CacheStep
  TooLargeFactor -- when cache size treated "too large" in comparison to user data size
  OnMissFactor -- If cache miss occurred and cache was cleaned,
@@ -235,6 +263,7 @@ struct LargeObjectCacheProps {
 
 template<typename Props>
 class LargeObjectCacheImpl {
+private:
     // The number of bins to cache large objects.
     static const uint32_t numBins = (Props::MaxSize-Props::MinSize)/Props::CacheStep;
 
@@ -262,6 +291,7 @@ class LargeObjectCacheImpl {
     // TODO: try to switch to 32-bit logical time to save space in CacheBin
     // and move bins to different cache lines.
     class CacheBin {
+    private:
         LargeMemoryBlock *first,
                          *last;
   /* age of an oldest block in the list; equal to last->age, if last defined,
@@ -278,33 +308,125 @@ class LargeObjectCacheImpl {
         size_t            usedSize,
   /* total size of all objects cached in the bin */
                           cachedSize;
-  /* time of last hit for the bin */
-        intptr_t          lastHit;
+  /* mean time of presence of block in the bin before successful reuse */
+        intptr_t          meanHitRange;
   /* time of last get called for the bin */
         uintptr_t         lastGet;
 
-        MallocMutex       lock;
+        /* The functor called by the aggregator for the operation list */
+        class CacheBinFunctor {
+            CacheBin *const bin;
+            ExtMemoryPool *const extMemPool;
+            BinBitMask *const bitMask;
+            const int idx;
+
+            LargeMemoryBlock *toRelease;
+            bool needCleanup;
+            uintptr_t currTime;
+
+            /* Do preprocessing under the operation list. */
+            /* All the OP_PUT_LIST operations are merged in the one operation.
+               All OP_GET operations are merged with the OP_PUT_LIST operations but
+               it demands the update of the moving average value in the bin.
+               Only the last OP_CLEAN_TO_THRESHOLD operation has sense.
+               The OP_CLEAN_ALL operation also should be performed only once.
+               Moreover it cancels the OP_CLEAN_TO_THRESHOLD operation. */
+            class OperationPreprocessor {
+                // TODO: remove the dependency on CacheBin.
+                CacheBin *const  bin;
+
+                /* Contains the relative time in the operation list.
+                   It counts in the reverse order since the aggregator also
+                   provides operations in the reverse order. */
+                uintptr_t lclTime;
+
+                /* opGet contains only OP_GET operations which cannot be merge with OP_PUT operations
+                   opClean contains all OP_CLEAN_TO_THRESHOLD and OP_CLEAN_ALL operations. */
+                CacheBinOperation *opGet, *opClean;
+                /* The time of the last OP_CLEAN_TO_THRESHOLD operations */
+                uintptr_t cleanTime;
+
+                /* lastGetOpTime - the time of the last OP_GET operation.
+                   lastGet - the same meaning as CacheBin::lastGet */
+                uintptr_t lastGetOpTime, lastGet;
+
+                /* The total sum of all usedSize decrements requested with CBOP_DECR_USED_SIZE operations. */
+                size_t decrUsedSize;
+
+                /* The list of blocks for the OP_PUT_LIST operation. */
+                LargeMemoryBlock *head, *tail;
+                int putListNum;
+
+                /* if the OP_CLEAN_ALL is requested. */
+                bool isCleanAll;
+
+                inline void commitOperation(CacheBinOperation *op) const;
+                inline void addOpToOpList(CacheBinOperation *op, CacheBinOperation **opList) const;
+                bool getFromPutList(CacheBinOperation* opGet, uintptr_t currTime);
+                void addToPutList( LargeMemoryBlock *head, LargeMemoryBlock *tail, int num );
+
+            public:
+                OperationPreprocessor(CacheBin *bin) :
+                    bin(bin), lclTime(0), opGet(NULL), opClean(NULL), cleanTime(0),
+                    lastGetOpTime(0), decrUsedSize(0), head(NULL), isCleanAll(false)  {}
+                void operator()(CacheBinOperation* opList);
+                uintptr_t getTimeRange() const { return -lclTime; }
+
+                friend class CacheBinFunctor;
+            };
+
+        public:
+            CacheBinFunctor(CacheBin *bin, ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx) :
+                bin(bin), extMemPool(extMemPool), bitMask(bitMask), idx(idx), toRelease(NULL), needCleanup(false) {}
+            void operator()(CacheBinOperation* opList);
+
+            bool isCleanupNeeded() const { return needCleanup; }
+            LargeMemoryBlock *getToRelease() const { return toRelease; }
+            uintptr_t getCurrTime() const { return currTime; }
+        };
+
+        typename MallocAggregator<CacheBinOperation>::type aggregator;
+
+        void ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx, bool longLifeTime = true);
+  /* ---------- unsafe methods used with the aggregator ---------- */
+        void forgetOutdatedState(uintptr_t currTime);
+        LargeMemoryBlock *putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask, int idx, int num);
+        LargeMemoryBlock *get();
+        LargeMemoryBlock *cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, int idx);
+        LargeMemoryBlock *cleanAll(BinBitMask *bitMask, int idx);
+        void updateUsedSize(size_t size, BinBitMask *bitMask, int idx) {
+            if (!usedSize) bitMask->set(idx, true);
+            usedSize += size;
+            if (!usedSize && !first) bitMask->set(idx, false);
+        }
+        void updateMeanHitRange( intptr_t hitRange ) {
+            hitRange = hitRange >= 0 ? hitRange : 0;
+            meanHitRange = meanHitRange ? (meanHitRange + hitRange)/2 : hitRange;
+        }
+        void updateAgeThreshold( uintptr_t currTime ) {
+            if (lastCleanedAge)
+                ageThreshold = Props::OnMissFactor*(currTime - lastCleanedAge);
+        }
+        void updateCachedSize(size_t size) { cachedSize += size; }
+        void setLastGet( uintptr_t newLastGet ) { lastGet = newLastGet; }
+  /* -------------------------------------------------------- */
+
   /* should be placed in zero-initialized memory, ctor not needed. */
         CacheBin();
-        void forgetOutdatedState(uintptr_t currT);
     public:
         void init() { memset(this, 0, sizeof(CacheBin)); }
-        LargeMemoryBlock *putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, int idx);
-        inline LargeMemoryBlock *get(size_t size, uintptr_t currTime, bool *setNonEmpty);
+        void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, int idx);
+        LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
+        bool cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime, int idx);
+        bool releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx);
+        void decrUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
+
         void decreaseThreshold() {
             if (ageThreshold)
-                ageThreshold = (ageThreshold + lastHit)/2;
+                ageThreshold = (ageThreshold + meanHitRange)/2;
         }
         void updateBinsSummary(BinsSummary *binsSummary) const {
             binsSummary->update(usedSize, cachedSize);
-        }
-        bool cleanToThreshold(Backend *backend, BinBitMask *bitMask, uintptr_t currTime, int idx);
-        bool cleanAll(Backend *backend, BinBitMask *bitMask, int idx);
-        void decrUsedSize(size_t size, BinBitMask *bitMask, int idx) {
-            MallocMutex::scoped_lock scoped_cs(lock);
-            usedSize -= size;
-            if (!usedSize && !first)
-                bitMask->set(idx, false);
         }
         size_t getSize() const { return cachedSize; }
         size_t getUsedSize() const { return usedSize; }
@@ -326,12 +448,11 @@ public:
     static int getNumBins() { return numBins; }
 
     void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *largeBlock);
-    LargeMemoryBlock *get(uintptr_t currTime, size_t size);
+    LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size);
 
-    void rollbackCacheState(size_t size);
-    uintptr_t cleanupCacheIfNeeded(ExtMemoryPool *extMemPool, uintptr_t currTime);
-    bool regularCleanup(Backend *backend, uintptr_t currAge);
-    bool cleanAll(Backend *backend);
+    void rollbackCacheState(ExtMemoryPool *extMemPool, size_t size);
+    bool regularCleanup(ExtMemoryPool *extMemPool, uintptr_t currAge, bool doThreshDecr);
+    bool cleanAll(ExtMemoryPool *extMemPool);
     void reset() {
         tooLargeLOC = 0;
         for (int i = numBins-1; i >= 0; i--)
@@ -350,17 +471,23 @@ public:
 class LargeObjectCache {
     static const size_t minLargeSize =  8*1024,
                         maxLargeSize =  8*1024*1024,
-                        maxHugeSize = 128*1024*1024;
+    // There are benchmarks of interest that should work well with objects of this size
+                        maxHugeSize = 129*1024*1024;
 public:
     // Difference between object sizes in large block bins
     static const uint32_t largeBlockCacheStep =  8*1024,
                           hugeBlockCacheStep = 512*1024;
 private:
-    typedef LargeObjectCacheImpl< LargeObjectCacheProps<minLargeSize, maxLargeSize, largeBlockCacheStep, 2, 2, 16> > LargeCacheType;
-    typedef LargeObjectCacheImpl< LargeObjectCacheProps<maxLargeSize, maxHugeSize, hugeBlockCacheStep, 1, 1, 4> > HugeCacheType;
+    typedef LargeObjectCacheProps<minLargeSize, maxLargeSize, largeBlockCacheStep, 2, 2, 16> LargeCacheTypeProps;
+    typedef LargeObjectCacheProps<maxLargeSize, maxHugeSize, hugeBlockCacheStep, 1, 1, 4> HugeCacheTypeProps;
+    typedef LargeObjectCacheImpl< LargeCacheTypeProps > LargeCacheType;
+    typedef LargeObjectCacheImpl< HugeCacheTypeProps > HugeCacheType;
 
-    LargeCacheType largeCache;
+    // beginning of largeCache is more actively used and smaller than hugeCache,
+    // so put hugeCache first to prevent false sharing
+    // with LargeObjectCache's predecessor
     HugeCacheType hugeCache;
+    LargeCacheType largeCache;
 
     /* logical time, incremented on each put/get operation
        To prevent starvation between pools, keep separately for each pool.
@@ -373,20 +500,23 @@ private:
     */
     uintptr_t cacheCurrTime;
 
+                     // memory pool that owns this LargeObjectCache,
+    ExtMemoryPool *extMemPool; // strict 1:1 relation, never changed
+
     static int sizeToIdx(size_t size);
-    bool doRegularCleanup(Backend *backend, uintptr_t currTime);
 public:
-    void put(ExtMemoryPool *extMemPool, LargeMemoryBlock *largeBlock);
-    void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head);
-    LargeMemoryBlock *get(Backend *backend, size_t size);
+    void init(ExtMemoryPool *memPool) { extMemPool = memPool; }
+    void put(LargeMemoryBlock *largeBlock);
+    void putList(LargeMemoryBlock *head);
+    LargeMemoryBlock *get(size_t size);
 
     void rollbackCacheState(size_t size);
-    void cleanupCacheIfNeeded(Backend *backend, uintptr_t currTime);
-    void cleanupCacheIfNeededOnRange(Backend *backend, uintptr_t range, uintptr_t currTime);
-    bool regularCleanup(Backend *backend) {
-        return doRegularCleanup(backend, FencedLoad((intptr_t&)cacheCurrTime));
-    }
-    bool cleanAll(Backend *backend);
+    bool isCleanupNeededOnRange(uintptr_t range, uintptr_t currTime);
+    bool doCleanup(uintptr_t currTime, bool doThreshDecr);
+
+    bool decreasingCleanup();
+    bool regularCleanup();
+    bool cleanAll();
     void reset() {
         largeCache.reset();
         hugeCache.reset();
@@ -403,8 +533,8 @@ public:
             : alignUp(size, hugeBlockCacheStep);
     }
 
-    uintptr_t getCurrTime();
-    uintptr_t getCurrTimeRange(uintptr_t range);
+    uintptr_t getCurrTime() { return (uintptr_t)AtomicIncrement((intptr_t&)cacheCurrTime); }
+    uintptr_t getCurrTimeRange(uintptr_t range) { return (uintptr_t)AtomicAdd((intptr_t&)cacheCurrTime, range)+1; }
 };
 
 class BackRefIdx { // composite index to backreference array
@@ -488,6 +618,7 @@ public:
 };
 
 class CoalRequestQ { // queue of free blocks that coalescing was delayed
+private:
     FreeBlock *blocksToFree;
 public:
     FreeBlock *getAll(); // return current list of blocks and make queue empty
@@ -518,6 +649,16 @@ public:
     void signal() { AtomicAdd(active, -1); }
 };
 
+enum MemRegionType {
+    // The region does not guarantee the block size.
+    MEMREG_FLEXIBLE_SIZE = 0,
+    // The region can hold exact number of blocks with the size of the
+    // first reqested block.
+    MEMREG_SEVERAL_BLOCKS,
+    // The region holds only one block with a reqested size.
+    MEMREG_ONE_BLOCK
+};
+
 class Backend {
 private:
 /* Blocks in range [minBinnedSize; getMaxBinnedSize()] are kept in bins,
@@ -527,11 +668,14 @@ private:
     enum {
         minBinnedSize = 8*1024UL,
         /*   If huge pages are available, maxBinned_HugePage used.
-             If not, maxBinned_SmallPage is the thresold.
+             If not, maxBinned_SmallPage is the threshold.
              TODO: use pool's granularity for upper bound setting.*/
         maxBinned_SmallPage = 1024*1024UL,
         // TODO: support other page sizes
         maxBinned_HugePage = 4*1024*1024UL
+    };
+    enum {
+        VALID_BLOCK_IN_BIN = 1 // valid block added to bin, not returned as result
     };
 public:
     static const int freeBinsNum =
@@ -557,18 +701,24 @@ public:
         void reset() { head = tail = 0; }
 #if __TBB_MALLOC_BACKEND_STAT
         size_t countFreeBlocks();
+        void reportStat(FILE *f);
 #endif
         bool empty() const { return !head; }
     };
 
-    // array of bins accomplished bitmask for fast finding of non-empty bins
+    typedef BitMaskMin<Backend::freeBinsNum> BitMaskBins;
+
+    // array of bins supplemented with bitmask for fast finding of non-empty bins
     class IndexedBins {
-        BitMaskMin<Backend::freeBinsNum> bitMask;
-        Bin                           freeBins[Backend::freeBinsNum];
+        BitMaskBins bitMask;
+        Bin         freeBins[Backend::freeBinsNum];
+        FreeBlock *getFromBin(int binIdx, BackendSync *sync, size_t size,
+                              bool resSlabAligned, bool alignedBin, bool wait,
+                              int *resLocked);
     public:
-        FreeBlock *getBlock(int binIdx, BackendSync *sync, size_t size,
-                            bool resSlabAligned, bool alignedBin, bool wait,
-                            int *resLocked);
+        FreeBlock *findBlock(int nativeBin, BackendSync *sync, size_t size,
+                             bool resSlabAligned, bool alignedBin, int *numOfLockedBins);
+        bool tryReleaseRegions(int binIdx, Backend *backend);
         void lockRemoveBlock(int binIdx, FreeBlock *fBlock);
         void addBlock(int binIdx, FreeBlock *fBlock, size_t blockSz, bool addToTail);
         bool tryAddBlock(int binIdx, FreeBlock *fBlock, bool addToTail);
@@ -582,15 +732,23 @@ public:
 #endif
         void reset();
     };
-    // number of OS/pool callback calls for more memory
-    class AskMemFromOSCounter {
-        intptr_t cnt;
-    public:
-        void OSasked() { AtomicIncrement(cnt); }
-        intptr_t get() const { return FencedLoad(cnt); }
-    };
 
 private:
+    class AdvRegionsBins {
+        BitMaskBins bins;
+    public:
+        void registerBin(int regBin) { bins.set(regBin, 1); }
+        int getMinUsedBin(int start) const { return bins.getMinTrue(start); }
+        void reset() { bins.reset(); }
+    };
+    // auxiliary class to atomic maximum request finding
+    class MaxRequestComparator {
+        const Backend *backend;
+    public:
+        MaxRequestComparator(const Backend *be) : backend(be) {}
+        inline bool operator()(size_t oldMaxReq, size_t requestSize) const;
+    };
+
     ExtMemoryPool *extMemPool;
     // used for release every region on pool destroying
     MemRegion     *regionList;
@@ -600,49 +758,56 @@ private:
     BackendSync    bkndSync;
     // semaphore protecting adding more more memory from OS
     MemExtendingSema memExtendingSema;
+    size_t         totalMemSize,
+                   memSoftLimit;
+    // Fixed pools request memory once per lifetime, during pool_create.
+    // Status of memory acquisition for such pool keeps here.
+    // So value is changed only for fixed pools, and without synchronization,
+    // as pool is not available till returning from pool_create.
+    bool           rawMemReceived;
 
-    // Using of maximal observed requested size allows descrease
-    // memory consumption for small requests and descrease fragmentation
+    // Using of maximal observed requested size allows decrease
+    // memory consumption for small requests and decrease fragmentation
     // for workloads when small and large allocation requests are mixed.
     // TODO: decrease, not only increase it
     size_t         maxRequestedSize;
-    void correctMaxRequestSize(size_t requestSize);
 
-    size_t addNewRegion(size_t rawSize, bool exact);
-    FreeBlock *findBlockInRegion(MemRegion *region);
-    void startUseBlock(MemRegion *region, FreeBlock *fBlock);
+    FreeBlock *addNewRegion(size_t size, MemRegionType type, bool addToBin);
+    FreeBlock *findBlockInRegion(MemRegion *region, size_t exactBlockSize);
+    void startUseBlock(MemRegion *region, FreeBlock *fBlock, bool addToBin);
     void releaseRegion(MemRegion *region);
 
-    bool askMemFromOS(size_t totalReqSize, intptr_t startModifiedCnt,
-                      int *lockedBinsThreshold,
-                      int numOfLockedBins, bool *largeBinsUpdated);
+    FreeBlock *askMemFromOS(size_t totalReqSize, intptr_t startModifiedCnt,
+                            int *lockedBinsThreshold, int numOfLockedBins,
+                            bool *splittable);
     FreeBlock *genericGetBlock(int num, size_t size, bool resSlabAligned);
     void genericPutBlock(FreeBlock *fBlock, size_t blockSz);
-    FreeBlock *getFromAlignedSpace(int binIdx, int num, size_t size, bool resSlabAligned, bool wait, int *locked);
-    FreeBlock *getFromBin(int binIdx, int num, size_t size, bool resSlabAligned, int *locked);
+    FreeBlock *splitUnalignedBlock(FreeBlock *fBlock, int num, size_t size,
+                              bool needAlignedRes);
+    FreeBlock *splitAlignedBlock(FreeBlock *fBlock, int num, size_t size,
+                            bool needAlignedRes);
 
     FreeBlock *doCoalesc(FreeBlock *fBlock, MemRegion **memRegion);
-    void coalescAndPutList(FreeBlock *head, bool forceCoalescQDrop);
+    bool coalescAndPutList(FreeBlock *head, bool forceCoalescQDrop);
     bool scanCoalescQ(bool forceCoalescQDrop);
     void coalescAndPut(FreeBlock *fBlock, size_t blockSz);
 
     void removeBlockFromBin(FreeBlock *fBlock);
 
-    void *getRawMem(size_t &size) const;
+    void *allocRawMem(size_t &size) const;
     void freeRawMem(void *object, size_t size) const;
 
     void putLargeBlock(LargeMemoryBlock *lmb);
+    void releaseCachesToLimit();
 public:
     void verify();
 #if __TBB_MALLOC_BACKEND_STAT
     void reportStat(FILE *f);
 #endif
-    bool bootstrap(ExtMemoryPool *extMemoryPool) {
-        extMemPool = extMemoryPool;
-        return addNewRegion(2*1024*1024, /*exact=*/false);
-    }
+    bool bootstrap(ExtMemoryPool *extMemoryPool);
     void reset();
     bool destroy();
+    bool clean(); // clean on caches cleanup
 
     BlockI *getSlabBlock(int num) {
         BlockI *b = (BlockI*)
@@ -661,7 +826,15 @@ public:
     LargeMemoryBlock *getLargeBlock(size_t size);
     void returnLargeObject(LargeMemoryBlock *lmb);
 
-    AskMemFromOSCounter askMemFromOSCounter;
+    void setRecommendedMaxSize(size_t softLimit) {
+        memSoftLimit = softLimit;
+        releaseCachesToLimit();
+    }
+    inline size_t getMaxBinnedSize() const;
+
+#if __TBB_MALLOC_WHITEBOX_TEST
+    size_t getTotalMemSize() const { return totalMemSize; }
+#endif
 private:
     static int sizeToBin(size_t size) {
         if (size >= maxBinned_HugePage)
@@ -676,17 +849,18 @@ private:
     }
 #if __TBB_MALLOC_BACKEND_STAT
     static size_t binToSize(int bin) {
-        MALLOC_ASSERT(bin < HUGE_BIN, "Invalid bin.");
+        MALLOC_ASSERT(bin <= HUGE_BIN, "Invalid bin.");
 
-        return bin*largeBlockCacheStep + minBinnedSize;
+        return bin*LargeObjectCache::largeBlockCacheStep + minBinnedSize;
     }
 #endif
     static bool toAlignedBin(FreeBlock *block, size_t size) {
         return isAligned((char*)block+size, slabSize)
             && size >= slabSize;
     }
-    inline size_t getMaxBinnedSize();
 
+    // register bins related to advance regions
+    AdvRegionsBins advRegBins;
     IndexedBins freeLargeBins,
                 freeAlignedBins;
 };
@@ -695,7 +869,6 @@ class AllLargeBlocksList {
     MallocMutex       largeObjLock;
     LargeMemoryBlock *loHead;
 public:
-    LargeMemoryBlock *getHead() { return loHead; }
     void add(LargeMemoryBlock *lmb);
     void remove(LargeMemoryBlock *lmb);
     template<bool poolDestroy> void releaseAll(Backend *backend);
@@ -703,6 +876,8 @@ public:
 
 struct ExtMemoryPool {
     Backend           backend;
+    LargeObjectCache  loc;
+    AllLocalCaches    allLocalCaches;
 
     intptr_t          poolId;
     // to find all large objects
@@ -713,10 +888,9 @@ struct ExtMemoryPool {
     size_t            granularity;
     bool              keepAllMemory,
                       delayRegsReleasing,
+    // TODO: implements fixedPool with calling rawFree on destruction
                       fixedPool;
     TLSKey            tlsPointerKey;  // per-pool TLS key
-
-    LargeObjectCache  loc;
 
     bool init(intptr_t poolId, rawAllocType rawAlloc, rawFreeType rawFree,
               size_t granularity, bool keepAllMemory, bool fixedPool);
@@ -725,17 +899,19 @@ struct ExtMemoryPool {
     // i.e., not system default pool for scalable_malloc/scalable_free
     bool userPool() const { return rawAlloc; }
 
-     // true if something has beed released
+     // true if something has been released
     bool softCachesCleanup();
-    bool releaseTLCaches();
-    // TODO: to release all thread's pools, not just current thread
+    bool releaseAllLocalCaches();
     bool hardCachesCleanup();
     void reset() {
         loc.reset();
+        allLocalCaches.reset();
         tlsPointerKey.~TLSKey();
         backend.reset();
     }
     void destroy() {
+        loc.reset();
+        allLocalCaches.reset();
         // pthread_key_dtors must be disabled before memory unmapping
         // TODO: race-free solution
         tlsPointerKey.~TLSKey();
@@ -787,7 +963,7 @@ public:
 // init() and printStatus() is called only under global initialization lock.
 // Race is possible between registerAllocation() and registerReleasing(),
 // harm is that up to single huge page releasing is missed (because failure
-// to get huge page is registred only 1st time), that is negligible.
+// to get huge page is registered only 1st time), that is negligible.
 // setMode is also can be called concurrently.
 // Object must reside in zero-initialized memory
 class HugePagesStatus {
@@ -828,6 +1004,10 @@ public:
         MallocMutex::scoped_lock lock(setModeLock);
         requestedMode.set(newVal);
         enabled = pageSize && newVal;
+    }
+    void reset() {
+        pageSize = 0;
+        needActualStatusPrint = enabled = wasObserved = 0;
     }
 };
 
@@ -905,8 +1085,7 @@ public:
         if (!malloc_proxy) {
 #if __FreeBSD__
 /* If !canUsePthread, we can't call pthread_self() before, but now pthread
-   is already on, so can do it. False positives here lead to silent switching
-   from malloc to mmap for all large allocations with bad performance impact. */
+   is already on, so can do it. */
             if (!canUsePthread) {
                 canUsePthread = true;
                 owner_thread = pthread_self();
@@ -928,8 +1107,6 @@ public:
 #endif  /* MALLOC_CHECK_RECURSION */
 
 bool isMallocInitializedExt();
-
-bool isLargeObject(void *object);
 
 unsigned int getThreadId();
 

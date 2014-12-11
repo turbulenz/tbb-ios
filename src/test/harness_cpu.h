@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 // Declarations for simple estimate of CPU time being used by a program.
@@ -87,43 +79,44 @@ static void TestCPUUserTime( int nthreads, int nactive = 1 ) {
 
     static double minimal_waittime = WAITTIME,
                   maximal_waittime = WAITTIME * 10;
-    double usrtime;
-    double waittime;
+    double usrtime_delta;
+    double waittime_delta;
     tbb::tick_count stamp = tbb::tick_count::now();
+    volatile intptr_t k = (intptr_t)&usrtime_delta;
     // wait for GetCPUUserTime update
-    while( (usrtime=GetCPUUserTime())-lastusrtime < THRESHOLD ) {
-        volatile intptr_t k = (intptr_t)&usrtime;
-        for ( int i = 0; i < 1000; ++i ) ++k;
-        if ( (waittime = (tbb::tick_count::now()-stamp).seconds()) > maximal_waittime ) {
+    while( (usrtime_delta=GetCPUUserTime()-lastusrtime) < THRESHOLD ) {
+        for ( int i = 0; i < 1000; ++i ) ++k; // do fake work without which user time can stall
+        if ( (waittime_delta = (tbb::tick_count::now()-stamp).seconds()) > maximal_waittime ) {
             REPORT( "Warning: %.2f sec elapsed but user mode time is still below its threshold (%g < %g)\n", 
-                    waittime, usrtime - lastusrtime, THRESHOLD );
+                    waittime_delta, usrtime_delta, THRESHOLD );
             break;
         }
     }
-    lastusrtime = usrtime;
-    
+    lastusrtime += usrtime_delta;
+
     // Wait for workers to go sleep
     stamp = tbb::tick_count::now();
-    while( ((waittime=(tbb::tick_count::now()-stamp).seconds()) < minimal_waittime) 
-            || ((usrtime=GetCPUUserTime()-lastusrtime) < THRESHOLD) )
+    while( ((waittime_delta=(tbb::tick_count::now()-stamp).seconds()) < minimal_waittime) 
+            || ((usrtime_delta=GetCPUUserTime()-lastusrtime) < THRESHOLD) )
     {
-        if ( waittime > maximal_waittime ) {
-            REPORT( "Warning: %.2f sec elapsed but GetCPUUserTime reported only %g sec\n", waittime, usrtime );
+        for ( int i = 0; i < 1000; ++i ) ++k; // do fake work without which user time can stall
+        if ( waittime_delta > maximal_waittime ) {
+            REPORT( "Warning: %.2f sec elapsed but GetCPUUserTime reported only %g sec\n", waittime_delta, usrtime_delta );
             break;
         }
     }
 
     // Test that all workers sleep when no work.
-    while( nactive>1 && usrtime-nactive*waittime<0 ) {
+    while( nactive>1 && usrtime_delta-nactive*waittime_delta<0 ) {
         // probably the number of active threads was mispredicted
         --nactive; ++nworkers;
     }
-    double avg_worker_usrtime = (usrtime-nactive*waittime)/nworkers;
+    double avg_worker_usrtime = (usrtime_delta-nactive*waittime_delta)/nworkers;
 
-    if( avg_worker_usrtime > waittime/2 )
+    if( avg_worker_usrtime > waittime_delta/2 )
         REPORT( "ERROR: %d worker threads are spinning; waittime: %g; usrtime: %g; avg worker usrtime: %g\n",
-                nworkers, waittime, usrtime, avg_worker_usrtime);
+                nworkers, waittime_delta, usrtime_delta, avg_worker_usrtime);
     else
         REMARK("%d worker threads; waittime: %g; usrtime: %g; avg worker usrtime: %g\n",
-                        nworkers, waittime, usrtime, avg_worker_usrtime);
+                        nworkers, waittime_delta, usrtime_delta, avg_worker_usrtime);
 }

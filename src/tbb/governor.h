@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef _TBB_governor_H
@@ -45,6 +37,10 @@ namespace internal {
 class market;
 class generic_scheduler;
 class __TBB_InitOnce;
+
+namespace rml {
+class tbb_client;
+}
 
 //------------------------------------------------------------------------
 // Class governor
@@ -71,8 +67,10 @@ class governor {
     static const task_scheduler_init *BlockingTSI;
 
 #if TBB_USE_ASSERT
-    static bool IsBlockingTermiantionInProgress;
+    static bool IsBlockingTerminationInProgress;
 #endif
+
+    static bool is_speculation_enabled;
 
     //! Create key for thread-local storage and initialize RML.
     static void acquire_resources ();
@@ -100,9 +98,6 @@ public:
 
     //! Processes scheduler termination request (possibly nested) in a master thread
     static void terminate_scheduler( generic_scheduler* s, const task_scheduler_init *tsi_ptr );
-
-    //! Returns number of worker threads in the currently active arena.
-    inline static unsigned max_number_of_workers ();
 
     //! Register TBB scheduler instance in thread-local storage.
     static void sign_on(generic_scheduler* s);
@@ -139,21 +134,19 @@ public:
 
     static bool needsWaitWorkers () { return BlockingTSI!=NULL; }
 
+    static bool does_client_join_workers (const tbb::internal::rml::tbb_client &client);
+
     //! Must be called before init_scheduler
     static void setBlockingTerminate(const task_scheduler_init *tsi);
 
 #if __TBB_SURVIVE_THREAD_SWITCH
     static __cilk_tbb_retcode stack_op_handler( __cilk_tbb_stack_op op, void* );
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
+    static bool speculation_enabled() { return is_speculation_enabled; }
+
 }; // class governor
 
 } // namespace internal
 } // namespace tbb
-
-#include "scheduler.h"
-
-inline unsigned tbb::internal::governor::max_number_of_workers () {
-    return local_scheduler()->number_of_workers_in_my_arena();
-}
 
 #endif /* _TBB_governor_H */

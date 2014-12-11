@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef __TBB_memory_pool_H
@@ -35,11 +27,8 @@
 /** @file */
 
 #include "scalable_allocator.h"
-#include "tbb_stddef.h"
-#include "tbb_machine.h" // TODO: avoid linkage with libtbb on IA-64 architecture
-#include "tbb/atomic.h" // for as_atomic
 #include <new> // std::bad_alloc
-#if __TBB_CPP11_RVALUE_REF_PRESENT && !__TBB_CPP11_STD_FORWARD_BROKEN
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
 #include <utility> // std::forward
 #endif
 
@@ -137,17 +126,16 @@ public:
         return (max > 0 ? max : 1);
     }
     //! Copy-construct value at location pointed to by p.
-#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
     template<typename U, typename... Args>
     void construct(U *p, Args&&... args)
- #if __TBB_CPP11_STD_FORWARD_BROKEN
-        { ::new((void *)p) U((args)...); }
- #else
         { ::new((void *)p) U(std::forward<Args>(args)...); }
- #endif
-#else // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#else // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
+#if __TBB_CPP11_RVALUE_REF_PRESENT
+    void construct( pointer p, value_type&& value ) {::new((void*)(p)) value_type(std::move(value));}
+#endif
     void construct( pointer p, const value_type& value ) { ::new((void*)(p)) value_type(value); }
-#endif // __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT
+#endif // __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
 
     //! Destroy value at location pointed to by p.
     void destroy( pointer p ) { p->~value_type(); }
@@ -240,9 +228,9 @@ void *memory_pool<Alloc>::allocate_request(intptr_t pool_id, size_t & bytes) {
     __TBB_CATCH(...) { return 0; }
     return ptr;
 }
-#if _MSC_VER==1700 && !defined(__INTEL_COMPILER)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" warning in the template below.
-    // Specific for VC++ 17 compiler
+    // Specific for VC++ 17-18 compiler
     #pragma warning (push)
     #pragma warning (disable: 4702)
 #endif
@@ -254,18 +242,20 @@ int memory_pool<Alloc>::deallocate_request(intptr_t pool_id, void* raw_ptr, size
     self.my_alloc.deallocate( static_cast<typename Alloc::value_type*>(raw_ptr), raw_bytes/unit_size );
     return 0;
 }
-#if _MSC_VER==1700 && !defined(__INTEL_COMPILER)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     #pragma warning (pop)
 #endif
 inline fixed_pool::fixed_pool(void *buf, size_t size) : my_buffer(buf), my_size(size) {
+    if( !buf || !size ) __TBB_THROW(std::bad_alloc());
     rml::MemPoolPolicy args(allocate_request, 0, size, /*fixedPool=*/true);
     rml::MemPoolError res = rml::pool_create_v1(intptr_t(this), &args, &my_pool);
     if( res!=rml::POOL_OK ) __TBB_THROW(std::bad_alloc());
 }
 inline void *fixed_pool::allocate_request(intptr_t pool_id, size_t & bytes) {
     fixed_pool &self = *reinterpret_cast<fixed_pool*>(pool_id);
-    if( !tbb::internal::as_atomic(self.my_size).compare_and_swap(0, (bytes=self.my_size)) )
-        return 0; // all the memory was given already
+    __TBBMALLOC_ASSERT(0 != self.my_size, "The buffer must not be used twice.");
+    bytes = self.my_size;
+    self.my_size = 0; // remember that buffer has been used
     return self.my_buffer;
 }
 

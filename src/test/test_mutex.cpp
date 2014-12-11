@@ -1,30 +1,25 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
+
+#define HARNESS_DEFAULT_MIN_THREADS 1
+#define HARNESS_DEFAULT_MAX_THREADS 3
 
 //------------------------------------------------------------------------
 // Test TBB mutexes when used with parallel_for.h
@@ -178,7 +173,7 @@ namespace tbb {
 /** Does not test features specific to reader-writer locks. */
 template<typename M>
 void Test( const char * name ) {
-    REMARK("%s time = ",name);
+    REMARK("%s size == %d, time = ",name, sizeof(M));
     Counter<M> counter;
     counter.value = 0;
     tbb::profiling::set_name(counter.mutex, name);
@@ -207,6 +202,8 @@ struct Invariant {
         for( size_t k=0; k<N; ++k )
             value[k] = 0;
         tbb::profiling::set_name(mutex, mutex_name_);
+    }
+    ~Invariant() {
     }
     void update() {
         for( size_t k=0; k<N; ++k )
@@ -321,13 +318,13 @@ void TestTryAcquireReader_OneThread( const char * mutex_name ) {
         else
             REPORT("ERROR for %s: try_acquire failed though it should not\n", mutex_name);
         {
-            typename M::scoped_lock lock2(tested_mutex, false);
-            if( lock1.try_acquire(tested_mutex) )
-                REPORT("ERROR for %s: try_acquire succeeded though it should not\n", mutex_name);
-            lock2.release();
-            lock2.acquire(tested_mutex, true);
-            if( lock1.try_acquire(tested_mutex, false) )
-                REPORT("ERROR for %s: try_acquire succeeded though it should not\n", mutex_name);
+            typename M::scoped_lock lock2(tested_mutex, false);   // read lock
+            if( lock1.try_acquire(tested_mutex) )                 // attempt to acquire read
+                REPORT("ERROR for %s: try_acquire succeeded though it should not (1)\n", mutex_name);
+            lock2.release();                                      // unlock
+            lock2.acquire(tested_mutex, true);                    // write lock
+            if( lock1.try_acquire(tested_mutex, false) )          // attempt to acquire read
+                REPORT("ERROR for %s: try_acquire succeeded though it should not (2)\n", mutex_name);
         }
         if( lock1.try_acquire(tested_mutex, false) )
             lock1.release();
@@ -356,7 +353,7 @@ void TestTryAcquire_OneThread( const char * mutex_name ) {
         } else {
             typename M::scoped_lock lock2(tested_mutex);
             if( lock1.try_acquire(tested_mutex) )
-                REPORT("ERROR for %s: try_acquire succeeded though it should not\n", mutex_name);
+                REPORT("ERROR for %s: try_acquire succeeded though it should not (3)\n", mutex_name);
         }
     }
     if( lock1.try_acquire(tested_mutex) )
@@ -390,7 +387,7 @@ struct RecursiveAcquisition {
         }
 
         if( (i&1)!=0 ) {
-            // acquire lock on location RecurArray[i] using explict acquire
+            // acquire lock on location RecurArray[i] using explicit acquire
             tbb::recursive_mutex::scoped_lock r_lock;
             r_lock.acquire( RecurMutex[i] );
             int a = RecurArray[i];
@@ -499,7 +496,7 @@ void TestNullMutex( const char * name ) {
     Counter<M> counter;
     counter.value = 0;
     const int n = 100;
-    REMARK("%s ",name);
+    REMARK("TestNullMutex<%s>",name);
     {
         tbb::parallel_for(tbb::blocked_range<size_t>(0,n,10),AddOne<Counter<M> >(counter));
     }
@@ -507,15 +504,16 @@ void TestNullMutex( const char * name ) {
     {
         tbb::parallel_for(tbb::blocked_range<size_t>(0,n,10),NullRecursive<Counter<M> >(counter));
     }
-
+    REMARK("\n");
 }
 
 template<typename M>
 void TestNullRWMutex( const char * name ) {
-    REMARK("%s ",name);
+    REMARK("TestNullRWMutex<%s>",name);
     const int n = 100;
     M m;
     tbb::parallel_for(tbb::blocked_range<size_t>(0,n,10),NullUpgradeDowngrade<M>(m, name));
+    REMARK("\n");
 }
 
 //! Test ISO C++0x compatibility portion of TBB mutex
@@ -547,7 +545,63 @@ void TestRecursiveMutexISO( const char * name ) {
     TestRecursiveMutex<tbb_from_iso>(name);
 }
 
+#include "harness_tsx.h"
 #include "tbb/task_scheduler_init.h"
+
+#if __TBB_TSX_TESTING_ENABLED_FOR_THIS_COMPILER
+
+//! Function object for use with parallel_for.h to see if a transaction is actually attempted.
+tbb::atomic<size_t> n_transactions_attempted;
+template<typename C>
+struct AddOne_CheckTransaction: NoAssign {
+    C& counter;
+    /** Increments counter once for each iteration in the iteration space. */
+    void operator()( tbb::blocked_range<size_t>& range ) const {
+        for( size_t i=range.begin(); i!=range.end(); ++i ) {
+            bool transaction_attempted = false;
+            {
+              typename C::mutex_type::scoped_lock lock(counter.mutex);
+              if( IsInsideTx() ) transaction_attempted = true;
+              counter.value = counter.value+1;
+            }
+            if( transaction_attempted ) ++n_transactions_attempted;
+            __TBB_Pause(i);
+        }
+    }
+    AddOne_CheckTransaction( C& counter_ ) : counter(counter_) {}
+};
+
+/* TestTransaction() checks if a speculative mutex actually uses transactions. */
+template<typename M>
+void TestTransaction( const char * name )
+{
+    Counter<M> counter;
+#if TBB_TEST_LOW_WORKLOAD
+    const int n = 100;
+#else
+    const int n = 1000;
+#endif
+    REMARK("TestTransaction with %s: ",name);
+
+    n_transactions_attempted = 0;
+    tbb::tick_count start, stop;
+    for( int i=0; i<5 && n_transactions_attempted==0; ++i ) {
+        counter.value = 0;
+        start = tbb::tick_count::now();
+        tbb::parallel_for(tbb::blocked_range<size_t>(0,n,2),AddOne_CheckTransaction<Counter<M> >(counter));
+        stop = tbb::tick_count::now();
+        if( counter.value!=n ) {
+            REPORT("ERROR for %s: counter.value=%ld\n",name,counter.value);
+            break;
+        }
+    }
+
+    if( n_transactions_attempted==0 )
+        REPORT( "ERROR: transactions were never attempted\n" );
+    else
+        REMARK("%d successful transactions in %6.6f seconds\n", (int)n_transactions_attempted, (stop - start).seconds());
+}
+#endif  /* __TBB_TSX_TESTING_ENABLED_FOR_THIS_COMPILER */
 
 int TestMain () {
     for( int p=MinThread; p<=MaxThread; ++p ) {
@@ -566,6 +620,7 @@ int TestMain () {
             TestNullMutex<tbb::null_rw_mutex>( "Null RW Mutex" );
             TestNullRWMutex<tbb::null_rw_mutex>( "Null RW Mutex" );
             Test<tbb::spin_mutex>( "Spin Mutex" );
+            Test<tbb::speculative_spin_mutex>( "Spin Mutex/speculative" );
 #if _OPENMP
             Test<OpenMP_Mutex>( "OpenMP_Mutex" );
 #endif /* _OPENMP */
@@ -574,8 +629,10 @@ int TestMain () {
             Test<tbb::recursive_mutex>( "Recursive Mutex" );
             Test<tbb::queuing_rw_mutex>( "Queuing RW Mutex" );
             Test<tbb::spin_rw_mutex>( "Spin RW Mutex" );
+            Test<tbb::speculative_spin_rw_mutex>( "Spin RW Mutex/speculative" );
 
             TestTryAcquire_OneThread<tbb::spin_mutex>("Spin Mutex");
+            TestTryAcquire_OneThread<tbb::speculative_spin_mutex>("Spin Mutex/speculative");
             TestTryAcquire_OneThread<tbb::queuing_mutex>("Queuing Mutex");
 #if USE_PTHREAD
             // under ifdef because on Windows tbb::mutex is reenterable and the test will fail
@@ -583,16 +640,20 @@ int TestMain () {
 #endif /* USE_PTHREAD */
             TestTryAcquire_OneThread<tbb::recursive_mutex>( "Recursive Mutex" );
             TestTryAcquire_OneThread<tbb::spin_rw_mutex>("Spin RW Mutex"); // only tests try_acquire for writers
+            TestTryAcquire_OneThread<tbb::speculative_spin_rw_mutex>("Spin RW Mutex/speculative"); // only tests try_acquire for writers
             TestTryAcquire_OneThread<tbb::queuing_rw_mutex>("Queuing RW Mutex"); // only tests try_acquire for writers
+
             TestTryAcquireReader_OneThread<tbb::spin_rw_mutex>("Spin RW Mutex");
+            TestTryAcquireReader_OneThread<tbb::speculative_spin_rw_mutex>("Spin RW Mutex/speculative");
             TestTryAcquireReader_OneThread<tbb::queuing_rw_mutex>("Queuing RW Mutex");
 
             TestReaderWriterLock<tbb::queuing_rw_mutex>( "Queuing RW Mutex" );
             TestReaderWriterLock<tbb::spin_rw_mutex>( "Spin RW Mutex" );
+            TestReaderWriterLock<tbb::speculative_spin_rw_mutex>( "Spin RW Mutex/speculative" );
 
             TestRecursiveMutex<tbb::recursive_mutex>( "Recursive Mutex" );
 
-            // Test ISO C++0x interface
+            // Test ISO C++11 interface
             TestISO<tbb::spin_mutex>( "ISO Spin Mutex" );
             TestISO<tbb::mutex>( "ISO Mutex" );
             TestISO<tbb::spin_rw_mutex>( "ISO Spin RW Mutex" );
@@ -609,7 +670,18 @@ int TestMain () {
             TestReaderWriterLockISO<tbb::spin_rw_mutex>( "ISO Spin RW Mutex" );
             TestRecursiveMutexISO<tbb::recursive_mutex>( "ISO Recursive Mutex" );
         }
-        REMARK( "calling destructor for task_scheduler_init\n" );
     }
+
+#if __TBB_TSX_TESTING_ENABLED_FOR_THIS_COMPILER
+    // additional test for speculative mutexes to see if we actually attempt lock elisions
+    if( have_TSX() ) {
+        tbb::task_scheduler_init init( MaxThread );
+        TestTransaction<tbb::speculative_spin_mutex>( "Spin Mutex/speculative" );
+        TestTransaction<tbb::speculative_spin_rw_mutex>( "Spin RW Mutex/speculative" );
+    }
+    else {
+        REMARK("Hardware transactions not supported\n");
+    }
+#endif
     return Harness::Done;
 }

@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef _TBB_mailbox_H
@@ -37,9 +29,6 @@
 
 namespace tbb {
 namespace internal {
-
-class generic_scheduler;
-class mail_outbox;
 
 struct task_proxy : public task {
     static const intptr_t      pool_bit = 1<<0;
@@ -111,8 +100,7 @@ protected:
 
 //! Class representing where mail is put.
 /** Padded to occupy a cache line. */
-class mail_outbox : unpadded_mail_outbox {
-    char pad[NFS_MaxLineSize-sizeof(unpadded_mail_outbox)];
+class mail_outbox : padded<unpadded_mail_outbox> {
 
     task_proxy* internal_pop() {
         task_proxy* const first = __TBB_load_relaxed(my_first);
@@ -152,6 +140,11 @@ public:
         // No release fence required for the next store, because there are no memory operations 
         // between the previous fully fenced atomic operation and the store.
         __TBB_store_relaxed(*link, &t);
+    }
+
+    //! Return true if mailbox is empty
+    bool empty() {
+        return __TBB_load_relaxed(my_first) == NULL;
     }
 
     //! Construct *this as a mailbox from zeroed memory.
@@ -205,6 +198,10 @@ public:
     //! Get next piece of mail, or NULL if mailbox is empty.
     task_proxy* pop() {
         return my_putter->internal_pop();
+    }
+    //! Return true if mailbox is empty
+    bool empty() {
+        return my_putter->empty();
     }
     //! Indicate whether thread that reads this mailbox is idle.
     /** Raises assertion failure if mailbox is redundantly marked as not idle. */

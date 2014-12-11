@@ -1,30 +1,25 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
+
+#define HARNESS_DEFAULT_MIN_THREADS 0
+#define HARNESS_DEFAULT_MAX_THREADS 4
 
 #include "tbb/enumerable_thread_specific.h"
 #include "tbb/task_scheduler_init.h"
@@ -1009,6 +1004,23 @@ void TestInstantiation() {
     ets3.combine(HasNoDefaultConstructorCombine());
 }
 
+class BigType {
+public:
+    BigType() { /* avoid cl warning C4345 about default initialization of POD types */ }
+    char my_data[12 * 1024 * 1024];
+};
+
+void TestConstructor() {
+    typedef tbb::enumerable_thread_specific<BigType> CounterBigType;
+    // Test default constructor
+    CounterBigType MyCounters; 
+    // Create a local instance.
+    CounterBigType::reference my_local = MyCounters.local();
+    my_local.my_data[0] = 'a';
+    // Test copy constructor
+    CounterBigType MyCounters2(MyCounters);
+}
+
 int TestMain () {
     TestInstantiation();
     run_segmented_iterator_tests();
@@ -1024,6 +1036,8 @@ int TestMain () {
     }
 
     run_assignment_and_copy_constructor_tests();
+
+    TestConstructor();
 
     return Harness::Done;
 }

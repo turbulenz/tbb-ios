@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 const unsigned MByte = 1024*1024;
@@ -34,7 +26,7 @@ bool __tbb_test_errno = false;
 #if __TBB_WIN8UI_SUPPORT	
 // testing allocator itself not iterfaces
 // so we can use desktop functions
-#define _CRT_USE_WINAPI_FAMILY_DESKTOP_APP 1
+#define _CRT_USE_WINAPI_FAMILY_DESKTOP_APP !_M_ARM
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
 #include "harness.h"
 // FIXME: fix the test to support New Windows *8 Store Apps mode.
@@ -112,9 +104,12 @@ void limitMem( size_t limit )
 #include "tbb/scalable_allocator.h"
 
 #define HARNESS_CUSTOM_MAIN 1
+#define HARNESS_TBBMALLOC_THREAD_SHUTDOWN 1
 #include "harness.h"
 #include "harness_barrier.h"
+#if !__TBB_SOURCE_DIRECTLY_INCLUDED
 #include "harness_tbb_independence.h"
+#endif
 #if __linux__
 #include <stdint.h> // uintptr_t
 #endif
@@ -322,9 +317,17 @@ int main(int argc, char* argv[]) {
     for (int i=1; i< argc; i++) {
         if (strcmp((char*)*(argv+i),"-s")==0)
         {
+#if __INTEL_COMPILER == 1400 && __linux__
+            // Workaround for Intel(R) C++ Compiler XE, version 14.0.0.080:
+            // unable to call setSystemAllocs() in such configuration.
+            REPORT("Known issue: Standard allocator testing is not supported.\n");
+            REPORT( "skip\n" );
+            return 0;
+#else
             setSystemAllocs();
             argC--;
             break;
+#endif
         }
     }
 
@@ -376,10 +379,17 @@ int main(int argc, char* argv[]) {
 
     for( int p=MaxThread; p>=MinThread; --p ) {
         REMARK("testing with %d threads\n", p );
-        Harness::SpinBarrier *barrier = new Harness::SpinBarrier(p);
-        NativeParallelFor( p, RoundRobin(p, barrier, Verbose) );
-        delete barrier;
+        for (int limit=0; limit<2; limit++) {
+            int ret = scalable_allocation_mode(TBBMALLOC_SET_SOFT_HEAP_LIMIT,
+                                               16*1024*limit);
+            ASSERT(ret==TBBMALLOC_OK, NULL);
+            Harness::SpinBarrier *barrier = new Harness::SpinBarrier(p);
+            NativeParallelFor( p, RoundRobin(p, barrier, Verbose) );
+            delete barrier;
+        }
     }
+    int ret = scalable_allocation_mode(TBBMALLOC_SET_SOFT_HEAP_LIMIT, 0);
+    ASSERT(ret==TBBMALLOC_OK, NULL);
     if( !error_occurred )
         REPORT("done\n");
     return 0;
@@ -1016,17 +1026,14 @@ void CMemTest::RunAllTests(int total_threads)
     if (Raligned_realloc)
         InvariantDataRealloc(/*aligned=*/true);
     TestAlignedParameters();
+    UniquePointer();
+    AddrArifm();
 #if __APPLE__
     REPORT("Known issue: some tests are skipped on OS X*\n");
 #else
-    UniquePointer();
-    AddrArifm();
-#if !__TBB_MIC_NATIVE
     NULLReturn(1*MByte,100*MByte,total_threads);
-#endif
 #endif
     if (FullLog) REPORT("Tests for %d threads ended\n", total_threads);
 }
 
 #endif /* __TBB_WIN8UI_SUPPORT	 */
-

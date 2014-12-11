@@ -1,38 +1,28 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
+
+#include "../../common/utility/utility.h"
 
 #if __TBB_MIC_OFFLOAD
 #pragma offload_attribute (push,target(mic))
 #endif // __TBB_MIC_OFFLOAD
-
-// This header should come before any other one.
-// For details, see Known Issues in the Release Notes.
-#include "tbb/tbb_stddef.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -42,8 +32,6 @@
 #include "tbb/tick_count.h"
 #include "tbb/task_scheduler_init.h"
 #include "tbb/task_group.h"
-
-#include "../../common/utility/utility.h"
 
 #pragma warning(disable: 4996)
 
@@ -61,7 +49,7 @@ const unsigned BOARD_DIM=9;
 using namespace tbb;
 using namespace std;
 
-atomic<unsigned> nSols;
+tbb::atomic<unsigned> nSols;
 bool find_one = false;
 bool verbose = false;
 unsigned short init_values[BOARD_SIZE] = {1,0,0,9,0,0,0,8,0,0,8,0,2,0,0,0,0,0,0,0,5,0,0,0,7,0,0,0,5,2,1,0,0,4,0,0,0,0,0,0,0,5,0,0,7,4,0,0,7,0,0,0,3,0,0,3,0,0,0,2,0,0,5,0,0,0,0,0,0,1,0,0,5,0,0,0,1,0,0,0,0};

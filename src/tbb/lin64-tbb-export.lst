@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #include "tbb/tbb_config.h"
@@ -72,12 +64,12 @@ __TBB_SYMBOL( _ZTVN3tbb10empty_taskE )
 
 #if __TBB_TASK_ARENA
 /* arena.cpp */
-__TBB_SYMBOL( _ZN3tbb10interface610task_arena18internal_terminateEv )
-__TBB_SYMBOL( _ZNK3tbb10interface610task_arena16internal_enqueueERNS_4taskEl )
-__TBB_SYMBOL( _ZNK3tbb10interface610task_arena16internal_executeERNS0_8internal13delegate_baseE )
-__TBB_SYMBOL( _ZN3tbb10interface610task_arena19internal_initializeEv )
-__TBB_SYMBOL( _ZN3tbb10interface610task_arena12current_slotEv )
-__TBB_SYMBOL( _ZNK3tbb10interface610task_arena13internal_waitEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base19internal_initializeEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base18internal_terminateEv )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base16internal_enqueueERNS_4taskEl )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base16internal_executeERNS1_13delegate_baseE )
+__TBB_SYMBOL( _ZNK3tbb10interface78internal15task_arena_base13internal_waitEv )
+__TBB_SYMBOL( _ZN3tbb10interface78internal15task_arena_base21internal_current_slotEv )
 #endif /* __TBB_TASK_ARENA */
 
 #if !TBB_NO_LEGACY
@@ -94,6 +86,7 @@ __TBB_SYMBOL( _ZNK3tbb18task_group_context28is_group_execution_cancelledEv )
 __TBB_SYMBOL( _ZN3tbb18task_group_context22cancel_group_executionEv )
 __TBB_SYMBOL( _ZN3tbb18task_group_context26register_pending_exceptionEv )
 __TBB_SYMBOL( _ZN3tbb18task_group_context5resetEv )
+__TBB_SYMBOL( _ZN3tbb18task_group_context19capture_fp_settingsEv )
 __TBB_SYMBOL( _ZN3tbb18task_group_context4initEv )
 __TBB_SYMBOL( _ZN3tbb18task_group_contextD1Ev )
 __TBB_SYMBOL( _ZN3tbb18task_group_contextD2Ev )
@@ -168,6 +161,13 @@ __TBB_SYMBOL( _ZN3tbb8internal33itt_store_pointer_with_release_v3EPvS1_ )
 __TBB_SYMBOL( _ZN3tbb8internal18call_itt_notify_v5EiPv )
 __TBB_SYMBOL( _ZN3tbb8internal20itt_set_sync_name_v3EPvPKc )
 __TBB_SYMBOL( _ZN3tbb8internal19itt_load_pointer_v3EPKv )
+#if __TBB_ITT_STRUCTURE_API
+__TBB_SYMBOL( _ZN3tbb8internal23itt_metadata_str_add_v7ENS0_15itt_domain_enumEPvyNS0_12string_indexEPKc )
+__TBB_SYMBOL( _ZN3tbb8internal22itt_make_task_group_v7ENS0_15itt_domain_enumEPvyS2_yNS0_12string_indexE )
+__TBB_SYMBOL( _ZN3tbb8internal17itt_task_begin_v7ENS0_15itt_domain_enumEPvyS2_yNS0_12string_indexE )
+__TBB_SYMBOL( _ZN3tbb8internal19itt_relation_add_v7ENS0_15itt_domain_enumEPvyNS0_12itt_relationES2_y )
+__TBB_SYMBOL( _ZN3tbb8internal15itt_task_end_v7ENS0_15itt_domain_enumE )
+#endif
 
 /* pipeline.cpp */
 __TBB_SYMBOL( _ZTIN3tbb6filterE )
@@ -227,6 +227,15 @@ __TBB_SYMBOL( _ZN3tbb13spin_rw_mutex23internal_release_writerEPS0_ )
 __TBB_SYMBOL( _ZN3tbb13spin_rw_mutex27internal_try_acquire_readerEPS0_ )
 __TBB_SYMBOL( _ZN3tbb13spin_rw_mutex27internal_try_acquire_writerEPS0_ )
 #endif
+
+// x86_rtm_rw_mutex.cpp
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex18internal_constructEv )
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex23internal_acquire_writerERNS2_11scoped_lockEb )
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex27internal_try_acquire_writerERNS2_11scoped_lockE )
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex23internal_acquire_readerERNS2_11scoped_lockEb )
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex16internal_releaseERNS2_11scoped_lockE )
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex16internal_upgradeERNS2_11scoped_lockE )
+__TBB_SYMBOL( _ZN3tbb10interface88internal16x86_rtm_rw_mutex18internal_downgradeERNS2_11scoped_lockE )
 
 /* spin_rw_mutex v3 */
 __TBB_SYMBOL( _ZN3tbb16spin_rw_mutex_v318internal_constructEv )
@@ -307,7 +316,9 @@ __TBB_SYMBOL( _ZTVN3tbb8internal24concurrent_queue_base_v3E )
 __TBB_SYMBOL( _ZN3tbb8internal33concurrent_queue_iterator_base_v36assignERKS1_ )
 __TBB_SYMBOL( _ZN3tbb8internal33concurrent_queue_iterator_base_v37advanceEv )
 __TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v313internal_pushEPKv )
+__TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v818internal_push_moveEPKv )
 __TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v325internal_push_if_not_fullEPKv )
+__TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v830internal_push_move_if_not_fullEPKv )
 __TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v312internal_popEPv )
 __TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v323internal_pop_if_presentEPv )
 __TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v314internal_abortEv )
@@ -317,6 +328,7 @@ __TBB_SYMBOL( _ZNK3tbb8internal24concurrent_queue_base_v313internal_sizeEv )
 __TBB_SYMBOL( _ZNK3tbb8internal24concurrent_queue_base_v314internal_emptyEv )
 __TBB_SYMBOL( _ZNK3tbb8internal24concurrent_queue_base_v324internal_throw_exceptionEv )
 __TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v36assignERKS1_ )
+__TBB_SYMBOL( _ZN3tbb8internal24concurrent_queue_base_v812move_contentERS1_ )
 
 #if !TBB_NO_LEGACY
 /* concurrent_vector.cpp v2 */

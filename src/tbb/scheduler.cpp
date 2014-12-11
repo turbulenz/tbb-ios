@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #include "custom_scheduler.h"
@@ -64,11 +56,15 @@ static task_group_context the_dummy_context(task_group_context::isolated);
 void Scheduler_OneTimeInitialization ( bool itt_present ) {
     AllocateSchedulerPtr = itt_present ? &custom_scheduler<DefaultSchedulerTraits>::allocate_scheduler :
                                       &custom_scheduler<IntelSchedulerTraits>::allocate_scheduler;
-#if __TBB_TASK_GROUP_CONTEXT && __TBB_TASK_PRIORITY
-    // There are no tasks belonging to this fake task group. So it should never
-    // prevent tasks from being passed to execution.
+#if __TBB_TASK_GROUP_CONTEXT
+    // There must be no tasks belonging to this fake task group. Mark invalid for the assert
+    __TBB_ASSERT(!(task_group_context::low_unused_state_bit & (task_group_context::low_unused_state_bit-1)), NULL);
+    the_dummy_context.my_state = task_group_context::low_unused_state_bit;
+#if __TBB_TASK_PRIORITY
+    // It should never prevent tasks from being passed to execution.
     the_dummy_context.my_priority = num_priority_levels - 1;
-#endif /* __TBB_TASK_GROUP_CONTEXT && __TBB_TASK_PRIORITY */
+#endif /* __TBB_TASK_PRIORITY */
+#endif /* __TBB_TASK_GROUP_CONTEXT */
 }
 
 //------------------------------------------------------------------------
@@ -109,10 +105,8 @@ generic_scheduler::generic_scheduler( arena* a, size_t index )
     , my_local_ctx_list_update(make_atomic(uintptr_t(0)))
 #endif /* __TBB_TASK_GROUP_CONTEXT */
 #if __TBB_TASK_PRIORITY
-    , my_ref_top_priority(NULL)
     , my_offloaded_tasks(NULL)
     , my_offloaded_task_list_tail_link(NULL)
-    , my_ref_reload_epoch(NULL)
     , my_local_reload_epoch(0)
     , my_pool_reshuffling_pending(false)
 #endif /* __TBB_TASK_PRIORITY */
@@ -133,8 +127,11 @@ generic_scheduler::generic_scheduler( arena* a, size_t index )
     my_last_global_observer = NULL;
     my_last_local_observer = NULL;
 #endif /* __TBB_SCHEDULER_OBSERVER */
+#if __TBB_TASK_PRIORITY
+    my_ref_top_priority = NULL;
+    my_ref_reload_epoch = NULL;
+#endif /* __TBB_TASK_PRIORITY */
 
-    hint_for_push = index ^ my_random.get(); // randomizer seed
     my_dummy_task = &allocate_task( sizeof(task), __TBB_CONTEXT_ARG(NULL, NULL) );
 #if __TBB_TASK_GROUP_CONTEXT
     my_context_list_head.my_prev = &my_context_list_head;
@@ -206,18 +203,13 @@ void generic_scheduler::init_stack_info () {
     // is that the main thread's stack size is not less than that of other threads.
     // See also comment 3 at the end of this file
     void    *stack_base = &stack_size;
+#if __linux__ && !__bg__
 #if __TBB_ipf
     void    *rsb_base = __TBB_get_bsp();
 #endif
-#if __linux__
     size_t  np_stack_size = 0;
     void    *stack_limit = NULL;
     pthread_attr_t  np_attr_stack;
-#if __bgp__
-    // Workaround pthread_attr_init() before pthread_getattr_np() prevents subsequent abort() in pthread_attr_destroy() when
-    // freeing an erroneously invalid pointer value for cpuset (refers to the implementation of opaque type pthread_attr_t).
-    if( 0 == pthread_attr_init(&np_attr_stack) )
-#endif
     if( 0 == pthread_getattr_np(pthread_self(), &np_attr_stack) ) {
         if ( 0 == pthread_attr_getstack(&np_attr_stack, &stack_limit, &np_stack_size) ) {
 #if __TBB_ipf
@@ -277,12 +269,11 @@ void generic_scheduler::cleanup_local_context_list () {
         context_list_node_t *node = my_context_list_head.my_next;
         while ( node != &my_context_list_head ) {
             task_group_context &ctx = __TBB_get_object_ref(task_group_context, my_node, node);
-            __TBB_ASSERT( ctx.my_kind != task_group_context::binding_required, "Only a context bound to a root task can be detached" );
+            __TBB_ASSERT( __TBB_load_relaxed(ctx.my_kind) != task_group_context::binding_required, "Only a context bound to a root task can be detached" );
             node = node->my_next;
             __TBB_ASSERT( is_alive(ctx.my_version_and_traits), "Walked into a destroyed context while detaching contexts from the local list" );
-            // On 64-bit systems my_kind can be a 32-bit value padded with 32 uninitialized bits.
-            // So the cast below is necessary to throw off the higher bytes containing garbage
-            if ( (task_group_context::kind_type)(uintptr_t)__TBB_FetchAndStoreW(&ctx.my_kind, task_group_context::detached) == task_group_context::dying )
+            // Synchronizes with ~task_group_context(). TODO: evaluate and perhaps relax
+            if ( internal::as_atomic(ctx.my_kind).fetch_and_store(task_group_context::detached) == task_group_context::dying )
                 wait_for_concurrent_destroyers_to_leave = true;
         }
     }
@@ -680,20 +671,7 @@ void tbb::internal::generic_scheduler::enqueue( task& t, void* prio ) {
     generic_scheduler *s = governor::local_scheduler();
     // these redirections are due to bw-compatibility, consider reworking some day
     __TBB_ASSERT( s->my_arena, "thread is not in any arena" );
-    s->my_arena->enqueue_task(t, (intptr_t)prio, s->hint_for_push );
-}
-
-inline task* generic_scheduler::dequeue_task() {
-    task* result = NULL;
-#if __TBB_TASK_PRIORITY
-    task_stream &ts = my_arena->my_task_stream[my_arena->my_top_priority];
-#else /* !__TBB_TASK_PRIORITY */
-    task_stream &ts = my_arena->my_task_stream;
-#endif /* !__TBB_TASK_PRIORITY */
-    ts.pop(result, my_arena_slot->hint_for_pop);
-    if (result)
-        ITT_NOTIFY(sync_acquired, &ts);
-    return result;
+    s->my_arena->enqueue_task(t, (intptr_t)prio, s->my_random );
 }
 
 #if __TBB_TASK_PRIORITY
@@ -709,8 +687,8 @@ task* generic_scheduler::winnow_task_pool () {
     __TBB_ASSERT( in_arena(), NULL );
     __TBB_ASSERT( my_offloaded_tasks, "At least one task is expected to be already offloaded" );
     // To eliminate possible sinking of the store to the indicator below the subsequent
-    // store to my_arena_slot->tail, the stores should've either been separated
-    // by full fence or both use release fences. And resetting indicator should've
+    // store to my_arena_slot->tail, the stores should have either been separated
+    // by full fence or both use release fences. And resetting indicator should have
     // been done with release fence. But since this is just an optimization, and
     // the corresponding checking sequence in arena::is_out_of_work() is not atomic
     // anyway, fences aren't used, so that not to penalize warmer path.
@@ -846,6 +824,9 @@ task* generic_scheduler::reload_tasks ( task*& offloaded_tasks, task**& offloade
 task* generic_scheduler::reload_tasks () {
     uintptr_t reload_epoch = *my_ref_reload_epoch;
     __TBB_ASSERT( my_offloaded_tasks, NULL );
+    __TBB_ASSERT( my_local_reload_epoch <= reload_epoch
+                  || my_local_reload_epoch - reload_epoch > uintptr_t(-1)/2,
+                  "Reload epoch counter overflow?" );
     if ( my_local_reload_epoch == reload_epoch )
         return NULL;
     __TBB_ASSERT( my_offloaded_tasks, NULL );
@@ -996,7 +977,7 @@ retry:
     return result;
 }
 
-inline task* generic_scheduler::get_mailbox_task() {
+task* generic_scheduler::get_mailbox_task() {
     __TBB_ASSERT( my_affinity_id>0, "not in arena" );
     while ( task_proxy* const tp = my_inbox.pop() ) {
         if ( task* result = tp->extract_task<task_proxy::mailbox_bit>() ) {
@@ -1005,7 +986,7 @@ inline task* generic_scheduler::get_mailbox_task() {
             return result;
         }
         // We have exclusive access to the proxy, and can destroy it.
-        free_task<small_task>(*tp);
+        free_task<no_cache_small_task>(*tp);
     }
     return NULL;
 }
@@ -1072,10 +1053,10 @@ generic_scheduler* generic_scheduler::create_master( arena& a ) {
     s->attach_mailbox(1);
     s->my_arena_slot = a.my_slots + 0;
     s->my_arena_slot->my_scheduler = s;
-#if _WIN32|_WIN64
+#if _WIN32||_WIN64
     __TBB_ASSERT( s->my_market, NULL );
     s->my_market->register_master( s->master_exec_resource );
-#endif /* _WIN32|_WIN64 */
+#endif /* _WIN32||_WIN64 */
     s->init_stack_info();
 #if __TBB_TASK_GROUP_CONTEXT
     // Sync up the local cancellation state with the global one. No need for fence here.
@@ -1134,9 +1115,9 @@ void generic_scheduler::cleanup_master() {
     }
     __TBB_ASSERT( s.my_market, NULL );
     market *my_market = s.my_market;
-#if _WIN32|_WIN64
+#if _WIN32||_WIN64
     s.my_market->unregister_master( s.master_exec_resource );
-#endif /* _WIN32|_WIN64 */
+#endif /* _WIN32||_WIN64 */
     arena* a = s.my_arena;
     __TBB_ASSERT(a->my_slots+0 == my_arena_slot, NULL);
 #if __TBB_STATISTICS
@@ -1163,10 +1144,14 @@ void generic_scheduler::cleanup_master() {
 #if __TBB_STATISTICS_EARLY_DUMP
     GATHER_STATISTIC( a->dump_arena_statistics() );
 #endif
-    if (governor::needsWaitWorkers())
+    // TODO: read global settings for the parameter at that point
+    // if workers are not joining, market can be released from on_thread_leaving(),
+    // so keep copy the state on local stack
+    bool must_join = my_market->join_workers = governor::needsWaitWorkers();
+    if (must_join)
         my_market->prepare_wait_workers();
     a->on_thread_leaving</*is_master*/true>();
-    if (governor::needsWaitWorkers())
+    if (must_join)
         my_market->wait_workers();
 }
 

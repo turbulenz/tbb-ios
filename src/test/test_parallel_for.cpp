@@ -1,39 +1,32 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 // Test for function template parallel_for.h
 
 // Enable testing of serial subset.
 #define TBB_PREVIEW_SERIAL_SUBSET 1
+#include "harness_defs.h"
 
 #if _MSC_VER
 #pragma warning (push)
-#if !defined(__INTEL_COMPILER)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Suppress pointless "unreachable code" warning.
     #pragma warning (disable: 4702)
 #endif
@@ -451,6 +444,139 @@ void TestSimplePartitionerStability(){
 #include <cstdio>
 #include "tbb/task_scheduler_init.h"
 #include "harness_cpu.h"
+#include "harness_barrier.h"
+#include "test_partitioner.h"
+
+namespace interaction_with_range_and_partitioner {
+
+// Test checks compatibility of parallel_for algorithm with various range implementations
+
+void test() {
+    using namespace test_partitioner_utils::interaction_with_range_and_partitioner;
+
+    test_partitioner_utils::SimpleBody b;
+    tbb::affinity_partitioner ap;
+
+    parallel_for(Range1(true, false), b, ap);
+    parallel_for(Range2(true, false), b, ap);
+    parallel_for(Range3(true, false), b, ap);
+    parallel_for(Range4(false, true), b, ap);
+    parallel_for(Range5(false, true), b, ap);
+    parallel_for(Range6(false, true), b, ap);
+
+    parallel_for(Range1(false, true), b, tbb::simple_partitioner());
+    parallel_for(Range2(false, true), b, tbb::simple_partitioner());
+    parallel_for(Range3(false, true), b, tbb::simple_partitioner());
+    parallel_for(Range4(false, true), b, tbb::simple_partitioner());
+    parallel_for(Range5(false, true), b, tbb::simple_partitioner());
+    parallel_for(Range6(false, true), b, tbb::simple_partitioner());
+
+    parallel_for(Range1(false, true), b, tbb::auto_partitioner());
+    parallel_for(Range2(false, true), b, tbb::auto_partitioner());
+    parallel_for(Range3(false, true), b, tbb::auto_partitioner());
+    parallel_for(Range4(false, true), b, tbb::auto_partitioner());
+    parallel_for(Range5(false, true), b, tbb::auto_partitioner());
+    parallel_for(Range6(false, true), b, tbb::auto_partitioner());
+}
+
+} // namespace interaction_with_range_and_partitioner
+
+namespace various_range_implementations {
+
+using namespace test_partitioner_utils;
+using namespace test_partitioner_utils::TestRanges;
+
+// Body ensures that initial work distribution is done uniformly through affinity mechanism and not
+// through work stealing
+class Body {
+    Harness::SpinBarrier &m_sb;
+public:
+    Body(Harness::SpinBarrier& sb) : m_sb(sb) { }
+    Body(Body& b, tbb::split) : m_sb(b.m_sb) { }
+    Body& operator =(const Body&) { return *this; }
+    template <typename Range>
+    void operator()(Range& r) const {
+        REMARK("Executing range [%lu, %lu)\n", r.begin(), r.end());
+        m_sb.timed_wait(10); // waiting for all threads
+    }
+};
+
+namespace correctness {
+
+/* Testing only correctness (that is parallel_for does not hang) */
+template <typename RangeType, bool /* feedback */, bool ensure_non_emptiness>
+void test() {
+    static const int thread_num = tbb::task_scheduler_init::default_num_threads();
+    RangeType range( 0, thread_num, NULL, false, ensure_non_emptiness );
+    tbb::affinity_partitioner ap;
+    tbb::parallel_for( range, SimpleBody(), ap );
+}
+
+} // namespace correctness
+
+namespace uniform_distribution {
+
+/* Body of parallel_for algorithm would hang if non-uniform work distribution happened  */
+template <typename RangeType, bool feedback, bool ensure_non_emptiness>
+void test() {
+    static const int thread_num = tbb::task_scheduler_init::default_num_threads();
+    Harness::SpinBarrier sb( thread_num );
+    RangeType range(0, thread_num, NULL, feedback, ensure_non_emptiness);
+    const Body sync_body( sb );
+    tbb::affinity_partitioner ap;
+    tbb::parallel_for( range, sync_body, ap );
+}
+
+} // namespace uniform_distribution
+
+void test() {
+    const bool provide_feedback = __TBB_ENABLE_RANGE_FEEDBACK;
+    const bool ensure_non_empty_range = true;
+
+    // BlockedRange does not take into account feedback and non-emptiness settings but uses the
+    // tbb::blocked_range implementation
+    uniform_distribution::test<BlockedRange, !provide_feedback, !ensure_non_empty_range>();
+
+#if __TBB_ENABLE_RANGE_FEEDBACK
+    using uniform_distribution::test; // if feedback is enabled ensure uniform work distribution
+#else
+    using correctness::test;
+#endif
+
+    {
+        test<RoundedDownRange, provide_feedback, ensure_non_empty_range>();
+        test<RoundedDownRange, provide_feedback, !ensure_non_empty_range>();
+#if __TBB_ENABLE_RANGE_FEEDBACK && !__TBB_MIC_NATIVE
+        // due to fast division algorithm on MIC
+        test<RoundedDownRange, !provide_feedback, ensure_non_empty_range>();
+        test<RoundedDownRange, !provide_feedback, !ensure_non_empty_range>();
+#endif
+    }
+
+    {
+        test<RoundedUpRange, provide_feedback, ensure_non_empty_range>();
+        test<RoundedUpRange, provide_feedback, !ensure_non_empty_range>();
+#if __TBB_ENABLE_RANGE_FEEDBACK && !__TBB_MIC_NATIVE
+        // due to fast division algorithm on MIC
+        test<RoundedUpRange, !provide_feedback, ensure_non_empty_range>();
+        test<RoundedUpRange, !provide_feedback, !ensure_non_empty_range>();
+#endif
+    }
+
+    // Testing that parallel_for algorithm works with such weird ranges
+    correctness::test<Range1_2, /* provide_feedback= */ false, !ensure_non_empty_range>();
+    correctness::test<Range1_999, /* provide_feedback= */ false, !ensure_non_empty_range>();
+    correctness::test<Range999_1, /* provide_feedback= */ false, !ensure_non_empty_range>();
+
+    // The following ranges do not comply with the proportion suggested by partitioner. Therefore
+    // they have to provide the proportion in which they were actually split back to partitioner and
+    // ensure theirs non-emptiness
+    test<Range1_2, provide_feedback, ensure_non_empty_range>();
+    test<Range1_999, provide_feedback, ensure_non_empty_range>();
+    test<Range999_1, provide_feedback, ensure_non_empty_range>();
+}
+
+} // namespace various_range_implementations
 
 int TestMain () {
     if( MinThread<1 ) {
@@ -517,8 +643,11 @@ int TestMain () {
     REPORT("Known issue: exception handling tests are skipped.\n");
 #endif
 #if (HAVE_m128 || HAVE_m256) && __TBB_SSE_STACK_ALIGNMENT_BROKEN
-    REPORT("Known issue: stack alignment for SSE/AVX not tested.\n");
+    REPORT("Known issue: stack alignment for SIMD instructions not tested.\n");
 #endif
+
+    various_range_implementations::test();
+    interaction_with_range_and_partitioner::test();
     return Harness::Done;
 }
 

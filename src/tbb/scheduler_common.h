@@ -1,35 +1,27 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef _TBB_scheduler_common_H
 #define _TBB_scheduler_common_H
 
-#include "tbb/tbb_stddef.h"
+#include "tbb/tbb_machine.h"
 #include "tbb/cache_aligned_allocator.h"
 
 #include <string.h>  // for memset, memcpy, memmove
@@ -50,9 +42,6 @@
 
 #include "tbb/task.h"
 #include "tbb/tbb_exception.h"
-#if __TBB_TASK_ARENA
-#include "tbb/task_arena.h" // for sake of private friends club :( of class arena ):
-#endif //__TBB_TASK_ARENA
 
 #ifdef undef_private
     #undef private
@@ -68,8 +57,10 @@
 // It drops the second argument depending on whether the controlling macro is defined.
 // The first argument is just a convenience allowing to keep comma before the macro usage.
 #if __TBB_TASK_GROUP_CONTEXT
+    #define __TBB_CONTEXT_ARG1(context) context
     #define __TBB_CONTEXT_ARG(arg1, context) arg1, context
 #else /* !__TBB_TASK_GROUP_CONTEXT */
+    #define __TBB_CONTEXT_ARG1(context)
     #define __TBB_CONTEXT_ARG(arg1, context) arg1
 #endif /* !__TBB_TASK_GROUP_CONTEXT */
 
@@ -80,6 +71,10 @@
 #define TBB_TRACE(x) ((void)(0))
 #endif /* DO_TBB_TRACE */
 
+#if !__TBB_CPU_CTL_ENV_PRESENT
+#include <fenv.h>
+#endif
+
 #if _MSC_VER && !defined(__INTEL_COMPILER)
     // Workaround for overzealous compiler warnings
     // These particular warnings are so ubiquitous that no attempt is made to narrow
@@ -88,16 +83,23 @@
 #endif
 
 namespace tbb {
-#if __TBB_TASK_ARENA
-namespace interface6 {
+namespace interface7 {
+namespace internal {
+class task_arena_base;
 class delegated_task;
 class wait_task;
-struct wait_body;
-}
-#endif //__TBB_TASK_ARENA
+}}
 namespace internal {
+using namespace interface7::internal;
 
+class arena;
+template<typename SchedulerTraits> class custom_scheduler;
 class generic_scheduler;
+class governor;
+class mail_outbox;
+class market;
+class observer_proxy;
+class task_scheduler_observer_v3;
 
 #if __TBB_TASK_PRIORITY
 static const intptr_t num_priority_levels = 3;
@@ -111,7 +113,7 @@ static const priority_t priority_from_normalized_rep[num_priority_levels] = {
     priority_low, priority_normal, priority_high
 };
 
-inline void assert_priority_valid ( intptr_t& p ) {
+inline void assert_priority_valid ( intptr_t p ) {
     __TBB_ASSERT_EX( p >= 0 && p < num_priority_levels, NULL );
 }
 
@@ -180,7 +182,11 @@ enum free_task_hint {
     small_task=2,
     //! Bitwise-OR of local_task and small_task.
     /** Task should be returned to free list of this scheduler. */
-    small_local_task=3
+    small_local_task=3,
+    //! Disable caching for a small task.
+    no_cache = 4,
+    //! Task is known to be a small task and must not be cached.
+    no_cache_small_task = no_cache | small_task
 };
 
 //------------------------------------------------------------------------
@@ -341,6 +347,49 @@ struct arena_slot : padded<arena_slot_line1>, padded<arena_slot_line2> {
         }
     }
 };
+
+#if !__TBB_CPU_CTL_ENV_PRESENT
+class cpu_ctl_env {
+    fenv_t *my_fenv_ptr;
+public:
+    cpu_ctl_env() : my_fenv_ptr(NULL) {}
+    ~cpu_ctl_env() {
+        if ( my_fenv_ptr )
+            tbb::internal::NFS_Free( (void*)my_fenv_ptr );
+    }
+    // It is possible not to copy memory but just to copy pointers but the following issues should be addressed:
+    //   1. The arena lifetime and the context lifetime are independent;
+    //   2. The user is allowed to recapture different FPU settings to context so 'current FPU settings' inside
+    //   dispatch loop may become invalid.
+    // But do we really want to improve the fenv implementation? It seems to be better to replace the fenv implementation
+    // with a platform specific implementation.
+    cpu_ctl_env( const cpu_ctl_env &src ) : my_fenv_ptr(NULL) {
+        *this = src;
+    }
+    cpu_ctl_env& operator=( const cpu_ctl_env &src ) {
+        __TBB_ASSERT( src.my_fenv_ptr, NULL );
+        if ( !my_fenv_ptr )
+            my_fenv_ptr = (fenv_t*)tbb::internal::NFS_Allocate(1, sizeof(fenv_t), NULL);
+        *my_fenv_ptr = *src.my_fenv_ptr;
+        return *this;
+    }
+    bool operator!=( const cpu_ctl_env &ctl ) const {
+        __TBB_ASSERT( my_fenv_ptr, "cpu_ctl_env is not initialized." );
+        __TBB_ASSERT( ctl.my_fenv_ptr, "cpu_ctl_env is not initialized." );
+        return memcmp( (void*)my_fenv_ptr, (void*)ctl.my_fenv_ptr, sizeof(fenv_t) );
+    }
+    void get_env () {
+        if ( !my_fenv_ptr )
+            my_fenv_ptr = (fenv_t*)tbb::internal::NFS_Allocate(1, sizeof(fenv_t), NULL);
+        fegetenv( my_fenv_ptr );
+    }
+    const cpu_ctl_env& set_env () const {
+        __TBB_ASSERT( my_fenv_ptr, "cpu_ctl_env is not initialized." );
+        fesetenv( my_fenv_ptr );
+        return *this;
+    }
+};
+#endif /* !__TBB_CPU_CTL_ENV_PRESENT */
 
 } // namespace internal
 } // namespace tbb

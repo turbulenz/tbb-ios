@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #ifndef _TBB_intrusive_list_H
@@ -79,7 +71,15 @@ class intrusive_list_base {
 
     public:
         iterator_impl () :  my_pos(NULL) {}
-        
+
+        Iterator& operator = ( const Iterator& it ) {
+            return my_pos = it.my_pos;
+        }
+
+        Iterator& operator = ( const T& val ) {
+            return my_pos = &node(val);
+        }
+
         bool operator == ( const Iterator& it ) const {
             return my_pos == it.my_pos;
         }
@@ -125,13 +125,12 @@ class intrusive_list_base {
 public:
     class iterator : public iterator_impl<iterator> {
         template <class U, class V> friend class intrusive_list_base;
-
+    public:
         iterator (intrusive_list_node* pos )
             : iterator_impl<iterator>(pos )
         {}
-    public:
         iterator () {}
-        
+
         T* operator-> () const { return &this->item(); }
 
         T& operator* () const { return this->item(); }
@@ -139,13 +138,12 @@ public:
 
     class const_iterator : public iterator_impl<const_iterator> {
         template <class U, class V> friend class intrusive_list_base;
-
+    public:
         const_iterator (const intrusive_list_node* pos )
             : iterator_impl<const_iterator>(const_cast<intrusive_list_node*>(pos) )
         {}
-    public:
         const_iterator () {}
-        
+
         const T* operator-> () const { return &this->item(); }
 
         const T& operator* () const { return this->item(); }
@@ -219,10 +217,10 @@ class memptr_intrusive_list : public intrusive_list_base<memptr_intrusive_list<T
     static intrusive_list_node& node ( T& val ) { return val.*NodePtr; }
 
     static T& item ( intrusive_list_node* node ) {
-        // Cannot use __TBB_offestof (and consequently __TBB_get_object_ref) macro 
+        // Cannot use __TBB_offsetof (and consequently __TBB_get_object_ref) macro 
         // with *NodePtr argument because gcc refuses to interpret pasted "->" and "*"
         // as member pointer dereferencing operator, and explicit usage of ## in 
-        // __TBB_offestof implementation breaks operations with normal member names.
+        // __TBB_offsetof implementation breaks operations with normal member names.
         return *reinterpret_cast<T*>((char*)node - ((ptrdiff_t)&(reinterpret_cast<T*>(0x1000)->*NodePtr) - 0x1000));
     }
 }; // intrusive_list<T, U, NodePtr>

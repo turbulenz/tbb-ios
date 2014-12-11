@@ -1,38 +1,33 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #include "tbb/scalable_allocator.h"
 #include "tbb/atomic.h"
 #include "tbb/aligned_space.h"
 
+#define HARNESS_TBBMALLOC_THREAD_SHUTDOWN 1
 #include "harness.h"
 #include "harness_barrier.h"
+#if !__TBB_SOURCE_DIRECTLY_INCLUDED
 #include "harness_tbb_independence.h"
+#endif
 
 tbb::atomic<int> FinishedTasks;
 const int MaxTasks = 16;
@@ -144,6 +139,11 @@ extern "C" void threadDtor(void*) {
     scalable_free(scalable_malloc(8));
 }
 
+inline bool intersectingObjects(const void *p1, const void *p2, size_t n)
+{
+    return (size_t)labs((uintptr_t)p1 - (uintptr_t)p2) < n;
+}
+
 struct TestThread: NoAssign {
     TestThread(int ) {}
 
@@ -153,7 +153,8 @@ struct TestThread: NoAssign {
         currSmall = scalable_malloc(8);
         ASSERT(!prevSmall || currSmall==prevSmall, "Possible memory leak");
         currLarge = scalable_malloc(32*1024);
-        ASSERT(!prevLarge || currLarge==prevLarge, "Possible memory leak");
+        // intersectingObjects takes into account object shuffle
+        ASSERT(!prevLarge || intersectingObjects(currLarge, prevLarge, 32*1024), "Possible memory leak");
         pthread_key_create( &key, &threadDtor );
         pthread_setspecific(key, (const void*)42);
     }

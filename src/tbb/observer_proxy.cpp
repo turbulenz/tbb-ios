@@ -1,34 +1,26 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 #include "tbb/tbb_config.h"
-#if !TBB_PREVIEW_LOCAL_OBSERVER
-    #error TBB_PREVIEW_LOCAL_OBSERVER must be defined
+#if !__TBB_ARENA_OBSERVER
+    #error __TBB_ARENA_OBSERVER must be defined
 #endif
 
 #if __TBB_SCHEDULER_OBSERVER
@@ -42,7 +34,7 @@
 namespace tbb {
 namespace internal {
 
-observer_list the_global_observer_list;
+padded<observer_list> the_global_observer_list;
 
 #if TBB_USE_ASSERT
 static atomic<int> observer_proxy_count;
@@ -59,12 +51,12 @@ static check_observer_proxy_count the_check_observer_proxy_count;
 #endif /* TBB_USE_ASSERT */
 
 interface6::task_scheduler_observer* observer_proxy::get_v6_observer() {
-    __TBB_ASSERT(my_version == 6, NULL);
+    if(my_version != 6) return NULL;
     return static_cast<interface6::task_scheduler_observer*>(my_observer);
 }
 
 bool observer_proxy::is_global() {
-    return my_version < 6 || get_v6_observer()->my_context_tag == interface6::task_scheduler_observer::global_tag;
+    return !get_v6_observer() || get_v6_observer()->my_context_tag == interface6::task_scheduler_observer::global_tag;
 }
 
 observer_proxy::observer_proxy( task_scheduler_observer_v3& tso )
@@ -113,11 +105,10 @@ void observer_list::clear () {
             // conflict with the proxy list cleanup.
             if ( !obs || !(p = (observer_proxy*)__TBB_FetchAndStoreW(&obs->my_proxy, 0)) )
                 continue;
+            // accessing 'obs' after detaching of obs->my_proxy leads to the race with observer destruction
             __TBB_ASSERT( !next || p == next->my_prev, NULL );
             __TBB_ASSERT( is_alive(p->my_ref_count), "Observer's proxy died prematurely" );
             __TBB_ASSERT( p->my_ref_count == 1, "Reference for observer is missing" );
-            __TBB_ASSERT( !obs->my_busy_count, "Local observer in an empty arena cannot be marked as busy" );
-            store<relaxed>( obs->my_busy_count, interface6::task_scheduler_observer::v6_trait );
 #if TBB_USE_ASSERT
             p->my_observer = NULL;
             p->my_ref_count = 0;
@@ -184,6 +175,7 @@ void observer_list::remove_ref( observer_proxy* p ) {
         if( !r )
             remove(p);
     }
+    __TBB_ASSERT( r || !p->my_ref_count, NULL );
     if( !r )
         delete p;
 }
@@ -208,8 +200,10 @@ void observer_list::do_notify_entry_observers( observer_proxy*& last, bool worke
                         // Reached the end of the list.
                         if( p == prev ) {
                             // Keep the reference as we store the 'last' pointer in scheduler
+                            __TBB_ASSERT(p->my_ref_count >= 1 + (p->my_observer?1:0), NULL);
                         } else {
                             // The last few proxies were empty
+                            __TBB_ASSERT(p->my_ref_count, NULL);
                             ++p->my_ref_count;
                             if( prev ) {
                                 lock.release();
@@ -238,6 +232,7 @@ void observer_list::do_notify_entry_observers( observer_proxy*& last, bool worke
         // Do not intercept any exceptions that may escape the callback so that
         // they are either handled by the TBB scheduler or passed to the debugger.
         tso->on_scheduler_entry(worker);
+        __TBB_ASSERT(p->my_ref_count, NULL);
         intptr_t bc = --tso->my_busy_count;
         __TBB_ASSERT_EX( bc>=0, "my_busy_count underflowed" );
         prev = p;
@@ -256,7 +251,7 @@ void observer_list::do_notify_exit_observers( observer_proxy* last, bool worker 
                 if( p ) {
                     // We were already processing the list.
                     if( p != last ) {
-                        __TBB_ASSERT( p->my_next, "List items before 'prev' must have valid my_next pointer" );
+                        __TBB_ASSERT( p->my_next, "List items before 'last' must have valid my_next pointer" );
                         if( p == prev )
                             remove_ref_fast(prev); // sets prev to NULL if successful
                         p = p->my_next;
@@ -288,16 +283,16 @@ void observer_list::do_notify_exit_observers( observer_proxy* last, bool worker 
         // Do not intercept any exceptions that may escape the callback so that
         // they are either handled by the TBB scheduler or passed to the debugger.
         tso->on_scheduler_exit(worker);
+        __TBB_ASSERT(p->my_ref_count || p == last, NULL);
         intptr_t bc = --tso->my_busy_count;
         __TBB_ASSERT_EX( bc>=0, "my_busy_count underflowed" );
         prev = p;
     }
 }
 
-#if __TBB_TASK_ARENA
-// TODO: merge with do_notify_.. methods
+#if __TBB_SLEEP_PERMISSION
 bool observer_list::ask_permission_to_leave() {
-    __TBB_ASSERT( this != &the_global_observer_list, "This method cannot be used on the list of global observers" );
+    __TBB_ASSERT( this == &the_global_observer_list, "This method cannot be used on lists of arena observers" );
     if( !my_head ) return true;
     // Pointer p marches though the list
     observer_proxy *p = NULL, *prev = NULL;
@@ -319,7 +314,7 @@ bool observer_list::ask_permission_to_leave() {
                         // Reached the end of the list.
                         if( prev ) {
                             lock.release();
-                            remove_ref(p);
+                            remove_ref(prev);
                         }
                         return result;
                     }
@@ -329,7 +324,7 @@ bool observer_list::ask_permission_to_leave() {
                     if( !p )
                         return result;
                 }
-                tso = p->get_v6_observer(); // all local observers are v6
+                tso = p->get_v6_observer();
             } while( !tso );
             ++p->my_ref_count;
             ++tso->my_busy_count;
@@ -341,7 +336,8 @@ bool observer_list::ask_permission_to_leave() {
         // Do not hold any locks on the list while calling user's code.
         // Do not intercept any exceptions that may escape the callback so that
         // they are either handled by the TBB scheduler or passed to the debugger.
-        result = tso->on_scheduler_leaving();
+        result = tso->may_sleep();
+        __TBB_ASSERT(p->my_ref_count, NULL);
         intptr_t bc = --tso->my_busy_count;
         __TBB_ASSERT_EX( bc>=0, "my_busy_count underflowed" );
         prev = p;
@@ -350,16 +346,18 @@ bool observer_list::ask_permission_to_leave() {
         remove_ref(prev);
     return result;
 }
-#endif //__TBB_TASK_ARENA
+#endif//__TBB_SLEEP_PERMISSION
 
 void task_scheduler_observer_v3::observe( bool enable ) {
     if( enable ) {
         if( !my_proxy ) {
             my_proxy = new observer_proxy( *this );
+            my_busy_count = 0; // proxy stores versioning information, clear it
             if ( !my_proxy->is_global() ) {
                 // Local observer activation
                 generic_scheduler* s = governor::local_scheduler_if_initialized();
 #if __TBB_TASK_ARENA
+                __TBB_ASSERT( my_proxy->get_v6_observer(), NULL );
                 intptr_t tag = my_proxy->get_v6_observer()->my_context_tag;
                 if( tag != interface6::task_scheduler_observer::implicit_tag ) { // explicit arena
                     task_arena *a = reinterpret_cast<task_arena*>(tag);
@@ -374,7 +372,6 @@ void task_scheduler_observer_v3::observe( bool enable ) {
                     my_proxy->my_list = &s->my_arena->my_observers;
                 }
                 my_proxy->my_list->insert(my_proxy);
-                my_busy_count = 0;
                 // Notify newly activated observer and other pending ones if it belongs to current arena
                 if(s && &s->my_arena->my_observers == my_proxy->my_list )
                     my_proxy->my_list->notify_entry_observers( s->my_last_local_observer, s->is_worker() );
@@ -382,7 +379,6 @@ void task_scheduler_observer_v3::observe( bool enable ) {
                 // Obsolete. Global observer activation
                 if( !__TBB_InitOnce::initialization_done() )
                     DoOneTimeInitializations();
-                my_busy_count = 0;
                 my_proxy->my_list = &the_global_observer_list;
                 my_proxy->my_list->insert(my_proxy);
                 if( generic_scheduler* s = governor::local_scheduler_if_initialized() ) {
@@ -405,13 +401,15 @@ void task_scheduler_observer_v3::observe( bool enable ) {
                 // Ensure that none of the list walkers relies on observer pointer validity
                 observer_list::scoped_lock lock(list.mutex(), /*is_writer=*/true);
                 proxy->my_observer = NULL;
+                // Proxy may still be held by other threads (to track the last notified observer)
+                if( !--proxy->my_ref_count ) {// nobody can increase it under exclusive lock
+                    list.remove(proxy);
+                    __TBB_ASSERT( !proxy->my_ref_count, NULL );
+                    delete proxy;
+                }
             }
-            intptr_t trait = proxy->my_version == 6 ? interface6::task_scheduler_observer::v6_trait : 0;
-            // Proxy may still be held by other threads (to track the last notified observer)
-            list.remove_ref(proxy);
-            while( my_busy_count )
+            while( my_busy_count ) // other threads are still accessing the callback
                 __TBB_Yield();
-            store<relaxed>( my_busy_count, trait );
         }
     }
 }

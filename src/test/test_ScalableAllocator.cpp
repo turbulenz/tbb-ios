@@ -1,29 +1,21 @@
 /*
-    Copyright 2005-2013 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
 
-    This file is part of Threading Building Blocks.
+    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
+    you can redistribute it and/or modify it under the terms of the GNU General Public License
+    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
+    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See  the GNU General Public License for more details.   You should have received a copy of
+    the  GNU General Public License along with Threading Building Blocks; if not, write to the
+    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
 
-    Threading Building Blocks is free software; you can redistribute it
-    and/or modify it under the terms of the GNU General Public License
-    version 2 as published by the Free Software Foundation.
-
-    Threading Building Blocks is distributed in the hope that it will be
-    useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with Threading Building Blocks; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    As a special exception, you may use this file as part of a free software
-    library without restriction.  Specifically, if other files instantiate
-    templates or use macros or inline functions from this file, or you compile
-    this file and link it with other files to produce an executable, this
-    file does not by itself cause the resulting executable to be covered by
-    the GNU General Public License.  This exception does not however
-    invalidate any other reasons why the executable file might be covered by
-    the GNU General Public License.
+    As a special exception,  you may use this file  as part of a free software library without
+    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
+    functions from this file, or you compile this file and link it with other files to produce
+    an executable,  this file does not by itself cause the resulting executable to be covered
+    by the GNU General Public License. This exception does not however invalidate any other
+    reasons why the executable file might be covered by the GNU General Public License.
 */
 
 // Test whether scalable_allocator complies with the requirements in 20.1.5 of ISO C++ Standard (1998).
@@ -32,18 +24,15 @@
 #define TBB_PREVIEW_MEMORY_POOL 1
 
 #include "harness_assert.h"
-#if __linux__  && __ia64__
-// Currently pools high-level interface has dependency to TBB library
-// to get atomics. For sake of testing add rudementary implementation of them.
+#if !__TBB_SOURCE_DIRECTLY_INCLUDED
+// harness_allocator.h requires atimics. We do not want dependency 
+// to TBB library to get atomics, so add rudimentary implementation of them.
 #include "harness_tbb_independence.h"
 #endif
 #include "tbb/memory_pool.h"
 #include "tbb/scalable_allocator.h"
 
-#if __TBB_SOURCE_DIRECTLY_INCLUDED && (_WIN32||_WIN64)
-#include "../tbbmalloc/tbbmalloc_internal_api.h"
-#define __TBBMALLOC_CALL_THREAD_SHUTDOWN 1
-#endif
+#define HARNESS_TBBMALLOC_THREAD_SHUTDOWN 1
 // the actual body of the test is there:
 #include "test_allocator.h"
 #include "harness_allocator.h"
@@ -115,11 +104,16 @@ void TestZeroSpaceMemoryPool() { }
 struct FixedPool {
     void  *buf;
     size_t size;
-    FixedPool(void *buf, size_t size) : buf(buf), size(size) {}
+    bool   used;
+    FixedPool(void *buf, size_t size) : buf(buf), size(size), used(false) {}
 };
 
 static void *fixedBufGetMem(intptr_t pool_id, size_t &bytes)
 {
+    if (((FixedPool*)pool_id)->used)
+        return NULL;
+
+    ((FixedPool*)pool_id)->used = true;
     bytes = ((FixedPool*)pool_id)->size;
     return ((FixedPool*)pool_id)->buf;
 }
