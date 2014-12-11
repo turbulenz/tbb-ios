@@ -86,6 +86,25 @@ ifeq (ppc32,$(arch))
     LIB_LINK_FLAGS += -arch ppc
 endif
 
+ifeq (1,$(macos_is_ios))
+  LINK_FLAGS := $(filter-out -dynamicilb,$(LINK_FLAGS)) -staticlib
+  LIB_LINK_FLAGS := $(filter-out -dynamiclib,$(LIB_LINK_FLAGS)) -static
+  CPLUS_FLAGS += -arch $(arch)
+  LIB_LINK_FLAGS += -arch_only $(arch)
+  LIB_LINK_CMD := libtool
+  DLL := a
+  EXPORT_KEY :=
+  LIBDL :=
+  LIBS :=
+  MALLOC.DEF :=
+  TBB.DEF :=
+endif
+
+ifdef SDKROOT
+    CPLUS_FLAGS += -isysroot $(SDKROOT)
+    LIB_LINK_FLAGS += -syslibroot $(SDKROOT) -L$(SDKROOT)/usr/lib/system -L$(SDKROOT)/usr/lib/
+endif
+
 #------------------------------------------------------------------------------
 # Setting assembler data.
 #------------------------------------------------------------------------------
