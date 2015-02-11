@@ -58,8 +58,8 @@ endif
 ####### Build settings ########################################################
 
 OBJ = o
-DLL = so
-LIBEXT=so
+DLL ?= so
+LIBEXT ?= so
 
 TBB.LST =
 TBB.DEF =

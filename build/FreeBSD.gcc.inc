@@ -27,11 +27,11 @@ WARNING_AS_ERROR_KEY = -Werror
 WARNING_KEY = -Wall
 DYLIB_KEY = -shared
 
-CPLUS = g++ 
-CONLY = gcc
-LIB_LINK_FLAGS = -shared
-LIBS = -lpthread 
-C_FLAGS = $(CPLUS_FLAGS)
+CPLUS ?= g++
+CONLY ?= gcc
+LIB_LINK_FLAGS ?= -shared
+LIBS = -lpthread
+C_FLAGS ?= $(CPLUS_FLAGS)
 
 ifeq ($(cfg), release)
         CPLUS_FLAGS = -g -O2 -DUSE_PTHREAD
