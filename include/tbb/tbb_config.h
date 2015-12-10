@@ -154,7 +154,7 @@
 /** on OS X* the only way to get C++11 is to use clang. For library features (e.g. exception_ptr) libc++ is also
  *  required. So there is no need to check GCC version for clang**/
     #define __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT     (__has_feature(__cxx_variadic_templates__))
-    #define __TBB_CPP11_RVALUE_REF_PRESENT             (__has_feature(__cxx_rvalue_references__) && (__TBB_GCC_VERSION >= 40300 || _LIBCPP_VERSION))
+    #define __TBB_CPP11_RVALUE_REF_PRESENT             (__has_feature(__cxx_rvalue_references__))
 /** TODO: extend exception_ptr related conditions to cover libstdc++ **/
     #define __TBB_EXCEPTION_PTR_PRESENT               (__cplusplus >= 201103L && _LIBCPP_VERSION)
     #define __TBB_MAKE_EXCEPTION_PTR_PRESENT          (__cplusplus >= 201103L && _LIBCPP_VERSION)
