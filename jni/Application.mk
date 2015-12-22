@@ -1,4 +1,4 @@
-# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks. Threading Building Blocks is free software;
 # you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -35,11 +35,11 @@ endif
 endif
 endif
 
-APP_PLATFORM:=android-20
+APP_PLATFORM:=android-21
 NDK_TOOLCHAIN_VERSION:=4.9
 
 # Intel(R) C++ Compiler does not support ndk r10 version yet.
-ifeq (icc,$(compiler))
+ifeq (iccx86,$(compiler)$(APP_ABI))
     APP_PLATFORM:=android-9
     NDK_TOOLCHAIN_VERSION:=4.8
 endif

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -37,6 +37,7 @@ typedef thread_monitor::handle_type thread_handle;
 class private_server;
 
 class private_worker: no_copy {
+private:
     //! State in finite-state machine that controls the worker.
     /** State diagram:
         init --> starting --> normal
@@ -120,6 +121,7 @@ public:
 #endif
 
 class private_server: public tbb_server, no_copy {
+private:
     tbb_client& my_client;
     //! Maximum number of threads to be created.
     /** Threads are created lazily, so maximum might not actually be reached. */
@@ -299,7 +301,7 @@ inline void private_worker::wake_or_launch() {
 #elif USE_PTHREAD
         {
         affinity_helper fpa;
-        fpa.protect_affinity_mask();
+        fpa.protect_affinity_mask( /*restore_process_mask=*/true );
         my_handle = thread_monitor::launch( thread_routine, this, my_server.my_stack_size );
         // Implicit destruction of fpa resets original affinity mask.
         }

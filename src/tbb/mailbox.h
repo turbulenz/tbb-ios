@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -187,7 +187,6 @@ public:
 
     //! Attach inbox to a corresponding outbox. 
     void attach( mail_outbox& putter ) {
-        __TBB_ASSERT(!my_putter,"already attached");
         my_putter = &putter;
     }
     //! Detach inbox from its outbox

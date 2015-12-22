@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -538,6 +538,24 @@ void TestSetPriority() {
             delete g_trees[t][i];
 }
 }//namespace test_propagation
+
+namespace regression {
+// This is a regression test for a bug with task_group_context used from a thread that created its local scheduler but not the implicit arena
+class TestTGContext {
+public:
+    void operator() (int) const {
+        tbb::task_group_context ctx;
+        ctx.cancel_group_execution();   // initializes the local weak scheduler on the thread
+        ctx.set_priority(tbb::priority_high);
+    }
+};
+
+void TestTGContextOnNewThread() {
+    REMARK("Testing a regression for a bug with task_group_context\n");
+    TestTGContext body;
+    NativeParallelFor(1, body);
+}
+}//namespace regression_priorities
 #endif /* __TBB_TASK_PRIORITY */
 
 #if !__TBB_TEST_SKIP_AFFINITY
@@ -573,6 +591,7 @@ int TestMain () {
     TestPrioritySwitchBetweenTwoMasters();
     PreemptionActivatorId = 1;
     TestPrioritySwitchBetweenTwoMasters();
+    regression::TestTGContextOnNewThread();
     return Harness::Done;
 }
 

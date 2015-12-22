@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -237,12 +237,6 @@ public:
             scalable_free(objsSmall[i]);
             scalable_free(objsLarge[i]);
         }
-#ifdef USE_WINTHREAD
-        // Under Windows DllMain is used for mallocThreadShutdownNotification
-        // calling. As DllMain is not used during whitebox testing,
-        // we have to call the callback manually.
-        __TBB_mallocThreadShutdownNotification();
-#endif
     }
 };
 
@@ -782,7 +776,7 @@ struct TestCleanAllBuffersDeallocate : public SimpleBarrier {
 };
 
 // The idea is to allocate a set of objects and then deallocate them in random
-// order in parallel to force occuring conflicts in backend during coalescing.
+// order in parallel to force occurring conflicts in backend during coalescing.
 // Thus if the backend does not check the queue of postponed coalescing
 // requests it will not be able to unmap all memory and a memory leak will be
 // observed.
@@ -959,7 +953,7 @@ void LOCModelTester() {
             defaultMemPool->extMemPool.freeLargeObject(lmb);
             cacheBinModel.putList(num);
         } else {
-            scen.saveLmb(defaultMemPool->extMemPool.mallocLargeObject(allocationSize));
+            scen.saveLmb(defaultMemPool->extMemPool.mallocLargeObject(defaultMemPool, allocationSize));
             cacheBinModel.get();
         }
 
@@ -1035,7 +1029,7 @@ public:
         barrier.wait();
         for ( int i=0; i<NUM_ALLOCS; ++i ) {
             defaultMemPool->extMemPool.freeLargeObject(
-                    defaultMemPool->extMemPool.mallocLargeObject(allocationSize) );
+                defaultMemPool->extMemPool.mallocLargeObject(defaultMemPool, allocationSize) );
         }
     }
 
@@ -1071,7 +1065,7 @@ public:
         barrier.wait();
         rml::internal::LargeMemoryBlock *lmbArray[NUM_ALLOCS];
         for ( int i=0; i<NUM_ALLOCS; ++i )
-            lmbArray[i] = defaultMemPool->extMemPool.mallocLargeObject(allocationSize);
+            lmbArray[i] = defaultMemPool->extMemPool.mallocLargeObject(defaultMemPool, allocationSize);
 
         barrier.wait(CheckNumAllocs(num_threads));
         for ( int i=0; i<NUM_ALLOCS; ++i )
@@ -1115,7 +1109,7 @@ void TestLOC() {
 int TestMain () {
     scalable_allocation_mode(USE_HUGE_PAGES, 0);
 #if !_XBOX && !__TBB_WIN8UI_SUPPORT
-    putenv((char*)"TBB_MALLOC_USE_HUGE_PAGES=yes");
+    Harness::SetEnv("TBB_MALLOC_USE_HUGE_PAGES","yes");
 #endif
     checkNoHugePages();
     // backreference requires that initialization was done

@@ -1,4 +1,4 @@
-# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks. Threading Building Blocks is free software;
 # you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -39,7 +39,13 @@ CONLY = $(tbb_tool_prefix)gcc
 # -soname is necessary for proper linkage to TBB prebuilt libraries when building application with Android SDK
 LIB_LINK_FLAGS = $(DYLIB_KEY) -Wl,-soname=$(BUILDING_LIBRARY)
 
-LINK_FLAGS = -Wl,-rpath-link=. -rdynamic
+# pie is necessary for test executables to work and might be removed if newer NDK will add it implicitly
+PIE_FLAG = -pie
+ifeq ($(APP_PIE), false)
+    PIE_FLAG=
+endif
+
+LINK_FLAGS = -Wl,-rpath-link=. -rdynamic $(PIE_FLAG)
 C_FLAGS = $(CPLUS_FLAGS)
 
 # gcc 4.4 and higher support C++11
@@ -94,8 +100,6 @@ endif
 ifeq (intel64,$(arch))
     CPLUS_FLAGS += -m64
     LIB_LINK_FLAGS += -m64
-    # pie is necessary for test executables to work and might be removed if newer NDK will add it implicitly
-    LINK_FLAGS += -pie
 endif
 
 ifeq (arm,$(findstring arm,$(arch)))

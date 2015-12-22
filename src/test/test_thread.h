@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -26,6 +26,19 @@
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
 #include "harness_report.h"
 #include "harness_assert.h"
+
+bool CheckSignatures() {
+    // Checks that thread ids can be compared, in the way users would do it
+    THREAD::id id1, id2;
+    bool result = id1 == id2;
+    result |= id1 != id2;
+    result |= id1 < id2;
+    result |= id1 > id2;
+    result |= id1 <= id2;
+    result |= id1 >= id2;
+    tbb::tbb_hash<THREAD::id> hash;
+    return result |= hash(id1)==hash(id2);
+}
 
 static const int THRDS = 3;
 static const int THRDS_DETACH = 2;
@@ -58,7 +71,6 @@ class Data: Base {
 public:
     int value;
 };
-
 
 #include "harness_barrier.h"
 
@@ -176,9 +188,8 @@ void CheckExceptionSafety() {
 #include <cstdio>
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
-
-tbb::tbb_thread returnThread() {
-    return tbb::tbb_thread();
+THREAD returnThread() {
+    return THREAD();
 }
 #endif
 
@@ -295,16 +306,4 @@ void RunTests() {
     }
 
     ASSERT( THREAD::hardware_concurrency() > 0, NULL);
-}
-
-typedef bool (*id_relation)( THREAD::id, THREAD::id );
-
-id_relation CheckSignatures() {
-    id_relation r[6] = {&tbb::operator==,
-                        &tbb::operator!=,
-                        &tbb::operator<,
-                        &tbb::operator>,
-                        &tbb::operator<=,
-                        &tbb::operator>=};
-    return r[1];
 }

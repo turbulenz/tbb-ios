@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -22,11 +22,10 @@
 
 #include "harness.h"
 #include "tbb/flow_graph.h"
+#include "harness_checktype.h"
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tick_count.h"
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #include "harness_graph.h"
-#endif
 
 #include <cstdio>
 
@@ -101,48 +100,52 @@ struct parallel_put_get : NoAssign {
 template< typename T >
 int test_reservation(int) {
     tbb::flow::graph g;
-    T bogus_value(-1);
 
     // Simple tests
     tbb::flow::priority_queue_node<T> q(g);
 
-    q.try_put(T(1));
-    q.try_put(T(2));
-    q.try_put(T(3));
-    g.wait_for_all();
+    {
 
-    T v=bogus_value, w=bogus_value;
-    ASSERT( q.try_reserve(v) == true, NULL );
-    ASSERT( v == T(3), NULL ); 
-    ASSERT( q.try_release() == true, NULL );
-    v = bogus_value;
-    g.wait_for_all();
-    ASSERT( q.try_reserve(v) == true, NULL );
-    ASSERT( v == T(3), NULL ); 
-    ASSERT( q.try_consume() == true, NULL );
-    v = bogus_value;
-    g.wait_for_all();
+        T bogus_value(-1);
+
+        q.try_put(T(1));
+        q.try_put(T(2));
+        q.try_put(T(3));
+        g.wait_for_all();
+
+        T v=bogus_value, w=bogus_value;
+        ASSERT( q.try_reserve(v) == true, NULL );
+        ASSERT( v == T(3), NULL ); 
+        ASSERT( q.try_release() == true, NULL );
+        v = bogus_value;
+        g.wait_for_all();
+        ASSERT( q.try_reserve(v) == true, NULL );
+        ASSERT( v == T(3), NULL ); 
+        ASSERT( q.try_consume() == true, NULL );
+        v = bogus_value;
+        g.wait_for_all();
  
-    ASSERT( q.try_get(v) == true, NULL );
-    ASSERT( v == T(2), NULL ); 
-    v = bogus_value;
-    g.wait_for_all();
-    
-    ASSERT( q.try_reserve(v) == true, NULL );
-    ASSERT( v == T(1), NULL ); 
-    ASSERT( q.try_reserve(w) == false, NULL );
-    ASSERT( w == bogus_value, NULL );
-    ASSERT( q.try_get(w) == false, NULL );
-    ASSERT( w == bogus_value, NULL );
-    ASSERT( q.try_release() == true, NULL );
-    v = bogus_value;
-    g.wait_for_all();
-    ASSERT( q.try_reserve(v) == true, NULL );
-    ASSERT( v == T(1), NULL ); 
-    ASSERT( q.try_consume() == true, NULL );
-    v = bogus_value;
-    g.wait_for_all();
-    ASSERT( q.try_get(v) == false, NULL );
+        ASSERT( q.try_get(v) == true, NULL );
+        ASSERT( v == T(2), NULL ); 
+        v = bogus_value;
+        g.wait_for_all();
+
+        ASSERT( q.try_reserve(v) == true, NULL );
+        ASSERT( v == T(1), NULL ); 
+        ASSERT( q.try_reserve(w) == false, NULL );
+        ASSERT( w == bogus_value, NULL );
+        ASSERT( q.try_get(w) == false, NULL );
+        ASSERT( w == bogus_value, NULL );
+        ASSERT( q.try_release() == true, NULL );
+        v = bogus_value;
+        g.wait_for_all();
+        ASSERT( q.try_reserve(v) == true, NULL );
+        ASSERT( v == T(1), NULL ); 
+        ASSERT( q.try_consume() == true, NULL );
+        v = bogus_value;
+        g.wait_for_all();
+        ASSERT( q.try_get(v) == false, NULL );
+    }
     return 0;
 }
 
@@ -334,14 +337,15 @@ int TestMain() {
         tbb::task_scheduler_init init(p);
         test_serial<int>();
         test_reservation<int>(p);
+        test_reservation<check_type<int> >(p);
         test_parallel<int>(p);
     } 
     stop = tbb::tick_count::now();
     REMARK("Priority_Queue_Node Time=%6.6f\n", (stop-start).seconds());
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     REMARK("Testing resets\n");
     test_resets<int,tbb::flow::priority_queue_node<int> >();
     test_resets<float,tbb::flow::priority_queue_node<float> >();
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     test_buffer_extract<tbb::flow::priority_queue_node<int> >().run_tests();
 #endif
     return Harness::Done;

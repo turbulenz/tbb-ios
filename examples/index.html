@@ -26,7 +26,7 @@ This directory has example usages of Intel&reg; Threading Building Blocks (Intel
 <DD>Examples using raw <CODE>task</CODE> interface.
 <DT><A HREF="task_group/index.html">task_group</A>
 <DD>Examples using <CODE>task_group</CODE> interface.
-<DT><A HREF="task_priority/index.html">task_priority</A>
+<DT><A HREF="task_arena/index.html">task_arena</A>
 <DD>Examples using the task priority feature.
 <DT><A HREF="test_all/index.html">test_all</A>
 <DD>Examples that test all the parts of the package.
@@ -109,9 +109,9 @@ Perform the following steps:
     <DD>Run an executable previously produced by one of the above commands.
     <DT><TT>make <B>[</B>(above options or targets)<B>]</B> CXX=<B>{</B>icl, icc<B>}</B></TT>
     <DD>Build and run as above, but use Intel&reg; compilers instead of default, native compilers (e.g., icl instead of cl.exe on Windows* systems, or icc instead of g++ on Linux* or OS X* systems).
-    <DT><A NAME=build_4><TT>make <B>[</B>(above options or targets)<B>]</B> offload=mic</B></TT></A>
-    <DD>Build and run the offload version of an example for Intel&reg Many Integrated Core (Intel&reg MIC) Architecture.
-    <DD><I>Note: Only Intel&reg MIC Architecture with Linux* based host is currently supported.</I>
+    <DT><A NAME=build_4><TT>make <B>[</B>(above options or targets)<B>]</B> offload=mic</TT></A>
+    <DD>Build and run the offload version of an example for Intel&reg; Many Integrated Core (Intel&reg; MIC) Architecture.
+    <DD><I>Note: Only Intel&reg; MIC Architecture with Linux* based host is currently supported.</I>
     <DT><TT>make clean</TT>
     <DD>Remove any executables or intermediate files produced by the above commands.
     </DL>
@@ -156,7 +156,7 @@ The environment may be set up, for a given type of shell window, by using one of
 <HR>
 <A href="../index.html">Up to parent directory</A>
 <p></p>
-Copyright &copy; 2005-2014 Intel Corporation.  All Rights Reserved.
+Copyright &copy; 2005-2015 Intel Corporation.  All Rights Reserved.
 <P></P>
 Intel is a registered trademark or trademark of Intel Corporation
 or its subsidiaries in the United States and other countries.

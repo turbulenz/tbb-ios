@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -25,9 +25,7 @@
 #include "tbb/task_scheduler_init.h"
 #include "tbb/tick_count.h"
 #include "harness_checktype.h"
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #include "harness_graph.h"
-#endif
 
 #include <cstdio>
 
@@ -128,7 +126,7 @@ struct touches {
                 printf("No touch at %d, my_num_threads = %d\n", n, my_num_threads);
             //ASSERT( all_touches[n] == true, "value not seen by any thread\n" );
         }
-        delete all_touches;
+        delete [] all_touches;
         return true;
     }
 
@@ -459,10 +457,10 @@ int TestMain() {
     } 
     stop = tbb::tick_count::now();
     REMARK("Queue_Node Time=%6.6f\n", (stop-start).seconds());
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     REMARK("Testing resets\n");
     test_resets<int, tbb::flow::queue_node<int> >();
     test_resets<float, tbb::flow::queue_node<float> >();
+#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     test_buffer_extract<tbb::flow::queue_node<int> >().run_tests();
 #endif
     return Harness::Done;

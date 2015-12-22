@@ -1,4 +1,4 @@
-# Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+# Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 #
 # This file is part of Threading Building Blocks. Threading Building Blocks is free software;
 # you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -33,6 +33,8 @@ ifneq ("command line","$(origin arch)")
         export COMPILER_VERSION := ICC: $(shell icc -V </dev/null 2>&1 | grep 'Version')
         ifneq (,$(findstring IA-32, $(COMPILER_VERSION)))
             export arch:=ia32
+        else ifneq (,$(findstring Intel(R) 64, $(COMPILER_VERSION)))
+            export arch:=intel64
         else
             $(error "No support for Android in $(COMPILER_VERSION)")
         endif

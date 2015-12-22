@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -305,13 +305,12 @@ bool init_iter(std::string *iter, std::string *sorted_list, size_t n, const std:
                 test_type = "sin";
                 for (size_t i = 0; i < n; i++) {
                     char buffer[20];
-// Getting rid of secure warning issued by C++ 14.00 and newer
-// sprintf_s is not defined in msvcrt.dll in windows XP and windows 2003 (used by MinGW gcc 4.5.2 with default spec)
-#if __STDC_SECURE_LIB__>=200411 && !__MINGW64__
+// Getting rid of secure warning issued by VC 14 and newer
+#if _MSC_VER && __STDC_SECURE_LIB__>=200411
                     sprintf_s(buffer, sizeof(buffer), "%f", float(sin(float(i))));
 #else
                     sprintf(buffer, "%f", float(sin(float(i))));
-#endif /* __STDC_SECURE_LIB__>=200411 || && !__MINGW64__ */
+#endif
                     sorted_list[i] = iter[i] = std::string(buffer);
                 }
                 break;

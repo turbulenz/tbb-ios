@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -28,6 +28,8 @@
 #include "itt_notify.h"
 #include "../rml/include/rml_tbb.h"
 
+#include "intrusive_list.h"
+
 #if __TBB_SURVIVE_THREAD_SWITCH
 #include "cilk-tbb-interop.h"
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
@@ -42,17 +44,8 @@ struct nested_arena_context;
 // generic_scheduler
 //------------------------------------------------------------------------
 
-#if __TBB_TASK_GROUP_CONTEXT
-struct scheduler_list_node_t {
-    scheduler_list_node_t *my_prev,
-                          *my_next;
-};
-#endif /* __TBB_TASK_GROUP_CONTEXT */
-
 #define EmptyTaskPool ((task**)0)
 #define LockedTaskPool ((task**)~(intptr_t)0)
-
-#define LockedMaster ((generic_scheduler*)~(intptr_t)0)
 
 struct scheduler_state {
     //! Index of the arena slot the scheduler occupies now, or occupied last time.
@@ -98,6 +91,7 @@ struct scheduler_state {
     //! Pointer to market's (for workers) or current arena's (for the master) reload epoch counter.
     volatile uintptr_t *my_ref_reload_epoch;
 #endif /* __TBB_TASK_PRIORITY */
+    bool my_is_worker;
 };
 
 //! Work stealing task scheduler.
@@ -107,7 +101,10 @@ struct scheduler_state {
     Class generic_scheduler is an abstract base class that contains most of the scheduler,
     except for tweaks specific to processors and tools (e.g. VTune).
     The derived template class custom_scheduler<SchedulerTraits> fills in the tweaks. */
-class generic_scheduler: public scheduler, public ::rml::job, public scheduler_state {
+class generic_scheduler: public scheduler
+                       , public ::rml::job
+                       , public intrusive_list_node
+                       , public scheduler_state {
 public: // almost every class in TBB uses generic_scheduler
 
     //! If sizeof(task) is <=quick_task_size, it is handled on a free list instead of malloc'd.
@@ -126,8 +123,7 @@ public: // almost every class in TBB uses generic_scheduler
 
     static const size_t null_arena_index = ~size_t(0);
 
-    // TODO: Rename into is_task_pool_published()
-    inline bool in_arena () const;
+    inline bool is_task_pool_published () const;
 
     inline bool is_local_task_pool_quiescent () const;
 
@@ -182,21 +178,18 @@ public: // almost every class in TBB uses generic_scheduler
 #endif
     }
 
-    //! Actions common to enter_arena and try_enter_arena
-    void do_enter_arena();
-
-    //! Used by workers to enter the arena 
+    //! Used by workers to enter the task pool
     /** Does not lock the task pool in case if arena slot has been successfully grabbed. **/
-    void enter_arena();
+    void publish_task_pool();
 
-    //! Leave the arena
-    /** Leaving arena automatically releases the task pool if it is locked. **/
-    void leave_arena();
+    //! Leave the task pool
+    /** Leaving task pool automatically releases the task pool if it is locked. **/
+    void leave_task_pool();
 
-    //! Resets head and tail indices to 0, and leaves arena
+    //! Resets head and tail indices to 0, and leaves task pool
     /** Argument specifies whether the task pool is currently locked by the owner
         (via acquire_task_pool).**/
-    inline void reset_deque_and_leave_arena ( bool locked );
+    inline void reset_task_pool_and_leave ( bool locked );
 
     //! Locks victim's task pool, and returns pointer to it. The pointer can be NULL.
     /** Garbles victim_arena_slot->task_pool for the duration of the lock. **/
@@ -260,10 +253,10 @@ public: // almost every class in TBB uses generic_scheduler
     size_t prepare_task_pool( size_t n );
 
     //! Initialize a scheduler for a master thread.
-    static generic_scheduler* create_master( arena& a );
+    static generic_scheduler* create_master( arena* a );
 
     //! Perform necessary cleanup when a master thread stops using TBB.
-    void cleanup_master();
+    void cleanup_master( bool needs_wait_workers );
 
     //! Initialize a scheduler for a worker thread.
     static generic_scheduler* create_worker( market& m, size_t index );
@@ -273,7 +266,7 @@ public: // almost every class in TBB uses generic_scheduler
 
 protected:
     template<typename SchedulerTraits> friend class custom_scheduler;
-    generic_scheduler( arena*, size_t index );
+    generic_scheduler( market & );
 
 public:
 #if TBB_USE_ASSERT > 1
@@ -284,9 +277,10 @@ public:
     void assert_task_pool_valid() const {}
 #endif /* TBB_USE_ASSERT <= 1 */
 
+    void attach_arena( arena*, size_t index, bool is_master );
 #if __TBB_TASK_ARENA
-    void nested_arena_entry(arena*, nested_arena_context &, bool);
-    void nested_arena_exit(nested_arena_context &);
+    void nested_arena_entry( arena*, size_t, nested_arena_context &, bool as_worker );
+    void nested_arena_exit( nested_arena_context & );
     void wait_until_empty();
 #endif
 
@@ -331,16 +325,6 @@ public:
     //! True if the scheduler is on the outermost dispatch level in a worker thread.
     inline bool worker_outermost_level () const;
 
-#if __TBB_TASK_GROUP_CONTEXT
-    //! Returns task group context used by this scheduler instance.
-    /** This context is associated with root tasks created by a master thread 
-        without explicitly specified context object outside of any running task.
-
-        Note that the default context of a worker thread is never accessed by
-        user code (directly or indirectly). **/
-    inline task_group_context* default_context ();
-#endif /* __TBB_TASK_GROUP_CONTEXT */
-
     //! Returns number of worker threads in the arena this thread belongs to.
     unsigned number_of_workers_in_my_arena();
 
@@ -355,6 +339,7 @@ public:
     __TBB_atomic intptr_t my_small_task_count;
 
     //! List of small tasks that have been returned to this scheduler by other schedulers.
+    // TODO IDEA: see if putting my_return_list on separate cache line improves performance
     task* my_return_list;
 
     //! Try getting a task from other threads (via mailbox, stealing, FIFO queue, orphans adoption).
@@ -365,6 +350,14 @@ public:
     void free_nonlocal_small_task( task& t ); 
 
 #if __TBB_TASK_GROUP_CONTEXT
+    //! Returns task group context used by this scheduler instance.
+    /** This context is associated with root tasks created by a master thread
+        without explicitly specified context object outside of any running task.
+
+        Note that the default context of a worker thread is never accessed by
+        user code (directly or indirectly). **/
+    inline task_group_context* default_context ();
+
     //! Padding isolating thread-local members from members that can be written to by other threads.
     char _padding1[NFS_MaxLineSize - sizeof(context_list_node_t)];
 
@@ -506,7 +499,7 @@ public:
 namespace tbb {
 namespace internal {
 
-inline bool generic_scheduler::in_arena () const {
+inline bool generic_scheduler::is_task_pool_published () const {
     __TBB_ASSERT(my_arena_slot, 0);
     return my_arena_slot->task_pool != EmptyTaskPool;
 }
@@ -548,10 +541,11 @@ inline void generic_scheduler::attach_mailbox( affinity_id id ) {
 }
 
 inline bool generic_scheduler::is_worker() {
-    return my_arena_index != 0; //TODO: rework for multiple master
+    return my_is_worker;
 }
 
 inline unsigned generic_scheduler::number_of_workers_in_my_arena() {
+    __TBB_ASSERT(my_arena, NULL);
     return my_arena->my_max_num_workers;
 }
 
@@ -575,12 +569,12 @@ inline intptr_t generic_scheduler::get_task_node_count( bool count_arena_workers
 }
 #endif /* __TBB_COUNT_TASK_NODES */
 
-inline void generic_scheduler::reset_deque_and_leave_arena ( bool locked ) {
+inline void generic_scheduler::reset_task_pool_and_leave ( bool locked ) {
     if ( !locked )
         acquire_task_pool();
     __TBB_store_relaxed( my_arena_slot->tail, 0 );
     __TBB_store_relaxed( my_arena_slot->head, 0 );
-    leave_arena();
+    leave_task_pool();
 }
 
 //TODO: move to arena_slot

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.4"/>
-<title>tbb::flow::interface7::multifunction_node&lt; Input, Output, queueing, Allocator &gt; Class Template Reference</title>
+<title>tbb::tick_count::interval_t Class Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -33,99 +33,74 @@
   </div>
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="a00231.html">tbb</a></li><li class="navelem"><b>flow</b></li><li class="navelem"><b>interface7</b></li><li class="navelem"><a class="el" href="a00093.html">multifunction_node< Input, Output, queueing, Allocator ></a></li>  </ul>
+<li class="navelem"><a class="el" href="a00274.html">tbb</a></li><li class="navelem"><a class="el" href="a00202.html">tick_count</a></li><li class="navelem"><a class="el" href="a00093.html">interval_t</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="#pro-methods">Protected Member Functions</a> &#124;
-<a href="#pro-static-attribs">Static Protected Attributes</a> &#124;
-<a href="a00329.html">List of all members</a>  </div>
+<a href="#friends">Friends</a> &#124;
+<a href="a00360.html">List of all members</a>  </div>
   <div class="headertitle">
-<div class="title">tbb::flow::interface7::multifunction_node&lt; Input, Output, queueing, Allocator &gt; Class Template Reference</div>  </div>
+<div class="title">tbb::tick_count::interval_t Class Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="dynheader">
-Inheritance diagram for tbb::flow::interface7::multifunction_node&lt; Input, Output, queueing, Allocator &gt;:</div>
-<div class="dyncontent">
- <div class="center">
-  <img src="a00093.png" usemap="#tbb::flow::interface7::multifunction_node&lt; Input, Output, queueing, Allocator &gt;_map" alt=""/>
-  <map id="tbb::flow::interface7::multifunction_node&lt; Input, Output, queueing, Allocator &gt;_map" name="tbb::flow::interface7::multifunction_node&lt; Input, Output, queueing, Allocator &gt;_map">
-<area href="a00065.html" title="The base of all graph nodes. " alt="tbb::flow::interface7::graph_node" shape="rect" coords="0,56,924,80"/>
-</map>
- </div></div>
+
+<p>Relative time interval.  
+ <a href="a00093.html#details">More...</a></p>
+
+<p><code>#include &lt;tick_count.h&gt;</code></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
-Public Types</h2></td></tr>
-<tr class="memitem:a3ba06cb25b27e0a818f197e8f24da1d5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3ba06cb25b27e0a818f197e8f24da1d5"></a>
-typedef Input&#160;</td><td class="memItemRight" valign="bottom"><b>input_type</b></td></tr>
-<tr class="separator:a3ba06cb25b27e0a818f197e8f24da1d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5727a047ab42213f88c3d2e6d2939aba"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5727a047ab42213f88c3d2e6d2939aba"></a>
-typedef <br class="typebreak"/>
-internal::wrap_tuple_elements<br class="typebreak"/>
-&lt; N, <br class="typebreak"/>
-internal::multifunction_output, <br class="typebreak"/>
-Output &gt;::type&#160;</td><td class="memItemRight" valign="bottom"><b>output_ports_type</b></td></tr>
-<tr class="separator:a5727a047ab42213f88c3d2e6d2939aba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a5c7aca52ec421142f4ab8a20026e7832"><td class="memTemplParams" colspan="2"><a class="anchor" id="a5c7aca52ec421142f4ab8a20026e7832"></a>
-template&lt;typename Body &gt; </td></tr>
-<tr class="memitem:a5c7aca52ec421142f4ab8a20026e7832"><td class="memTemplItemLeft" align="right" valign="top">&#160;</td><td class="memTemplItemRight" valign="bottom"><b>multifunction_node</b> (<a class="el" href="a00063.html">graph</a> &amp;g, size_t concurrency, Body body)</td></tr>
-<tr class="separator:a5c7aca52ec421142f4ab8a20026e7832"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad27702d05f0e572e767ebda96bcc76f6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad27702d05f0e572e767ebda96bcc76f6"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>multifunction_node</b> (const <a class="el" href="a00092.html">multifunction_node</a> &amp;other)</td></tr>
-<tr class="separator:ad27702d05f0e572e767ebda96bcc76f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acb5cf6fedb110906dd4811ab6f223741"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="acb5cf6fedb110906dd4811ab6f223741"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>set_name</b> (const char *name)</td></tr>
-<tr class="separator:acb5cf6fedb110906dd4811ab6f223741"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pub_methods_a00065"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_a00065')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="a00065.html">tbb::flow::interface7::graph_node</a></td></tr>
-<tr class="memitem:a4badd313105e30f539882276353dcb8e inherit pub_methods_a00065"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4badd313105e30f539882276353dcb8e"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>graph_node</b> (<a class="el" href="a00063.html">graph</a> &amp;g)</td></tr>
-<tr class="separator:a4badd313105e30f539882276353dcb8e inherit pub_methods_a00065"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a05e4f487c0bf45c7326062befeb2c7c4 inherit pub_methods_a00065"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a05e4f487c0bf45c7326062befeb2c7c4"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>extract</b> (reset_flags f=rf_extract)</td></tr>
-<tr class="separator:a05e4f487c0bf45c7326062befeb2c7c4 inherit pub_methods_a00065"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a95e3e14750bebafe719856176e2737db"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a95e3e14750bebafe719856176e2737db"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#a95e3e14750bebafe719856176e2737db">interval_t</a> ()</td></tr>
+<tr class="memdesc:a95e3e14750bebafe719856176e2737db"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a time interval representing zero time duration. <br/></td></tr>
+<tr class="separator:a95e3e14750bebafe719856176e2737db"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a73b462297173f6bffa15bc5a86c30ef4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a73b462297173f6bffa15bc5a86c30ef4"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#a73b462297173f6bffa15bc5a86c30ef4">interval_t</a> (double sec)</td></tr>
+<tr class="memdesc:a73b462297173f6bffa15bc5a86c30ef4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a time interval representing sec seconds time duration. <br/></td></tr>
+<tr class="separator:a73b462297173f6bffa15bc5a86c30ef4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abe81446bbbb6b6e98d854b91acf47809"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abe81446bbbb6b6e98d854b91acf47809"></a>
+double&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#abe81446bbbb6b6e98d854b91acf47809">seconds</a> () const </td></tr>
+<tr class="memdesc:abe81446bbbb6b6e98d854b91acf47809"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the length of a time interval in seconds. <br/></td></tr>
+<tr class="separator:abe81446bbbb6b6e98d854b91acf47809"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a19bf32f4541252daaa6b09fd33fa9177"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a19bf32f4541252daaa6b09fd33fa9177"></a>
+<a class="el" href="a00093.html">interval_t</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#a19bf32f4541252daaa6b09fd33fa9177">operator+=</a> (const <a class="el" href="a00093.html">interval_t</a> &amp;i)</td></tr>
+<tr class="memdesc:a19bf32f4541252daaa6b09fd33fa9177"><td class="mdescLeft">&#160;</td><td class="mdescRight">Accumulation operator. <br/></td></tr>
+<tr class="separator:a19bf32f4541252daaa6b09fd33fa9177"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3394d9f3678e6a4c3d6e1be840fe2ff2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3394d9f3678e6a4c3d6e1be840fe2ff2"></a>
+<a class="el" href="a00093.html">interval_t</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#a3394d9f3678e6a4c3d6e1be840fe2ff2">operator-=</a> (const <a class="el" href="a00093.html">interval_t</a> &amp;i)</td></tr>
+<tr class="memdesc:a3394d9f3678e6a4c3d6e1be840fe2ff2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Subtraction operator. <br/></td></tr>
+<tr class="separator:a3394d9f3678e6a4c3d6e1be840fe2ff2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-methods"></a>
-Protected Member Functions</h2></td></tr>
-<tr class="memitem:a61e88c5ef99614130ca85e98a62d59af"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a61e88c5ef99614130ca85e98a62d59af"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>reset</b> (__TBB_PFG_RESET_ARG(reset_flags f))</td></tr>
-<tr class="separator:a61e88c5ef99614130ca85e98a62d59af"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pro_methods_a00065"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_a00065')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="a00065.html">tbb::flow::interface7::graph_node</a></td></tr>
-<tr class="memitem:ab6a10ef630149e093190317ec056b4de inherit pro_methods_a00065"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab6a10ef630149e093190317ec056b4de"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>reset</b> (__TBB_PFG_RESET_ARG(reset_flags f=rf_reset_protocol))=0</td></tr>
-<tr class="separator:ab6a10ef630149e093190317ec056b4de inherit pro_methods_a00065"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-static-attribs"></a>
-Static Protected Attributes</h2></td></tr>
-<tr class="memitem:abfe0d66c5fc2d700443c025a6baab799"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abfe0d66c5fc2d700443c025a6baab799"></a>
-static const int&#160;</td><td class="memItemRight" valign="bottom"><b>N</b> = tbb::flow::tuple_size&lt;Output&gt;::value</td></tr>
-<tr class="separator:abfe0d66c5fc2d700443c025a6baab799"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="inherited"></a>
-Additional Inherited Members</h2></td></tr>
-<tr class="inherit_header pro_attribs_a00065"><td colspan="2" onclick="javascript:toggleInherit('pro_attribs_a00065')"><img src="closed.png" alt="-"/>&#160;Protected Attributes inherited from <a class="el" href="a00065.html">tbb::flow::interface7::graph_node</a></td></tr>
-<tr class="memitem:a1caee1c5677047b05d18b1662ca6fdf8 inherit pro_attribs_a00065"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1caee1c5677047b05d18b1662ca6fdf8"></a>
-<a class="el" href="a00063.html">graph</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>my_graph</b></td></tr>
-<tr class="separator:a1caee1c5677047b05d18b1662ca6fdf8 inherit pro_attribs_a00065"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af48cd0cd4f6e44efc3b353adb55f86a8 inherit pro_attribs_a00065"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af48cd0cd4f6e44efc3b353adb55f86a8"></a>
-<a class="el" href="a00065.html">graph_node</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>next</b></td></tr>
-<tr class="separator:af48cd0cd4f6e44efc3b353adb55f86a8 inherit pro_attribs_a00065"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6917bffc3cb150319679bf2395e68caa inherit pro_attribs_a00065"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6917bffc3cb150319679bf2395e68caa"></a>
-<a class="el" href="a00065.html">graph_node</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>prev</b></td></tr>
-<tr class="separator:a6917bffc3cb150319679bf2395e68caa inherit pro_attribs_a00065"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="friends"></a>
+Friends</h2></td></tr>
+<tr class="memitem:a68e741a8f6e2384027e93d1f654ad100"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a68e741a8f6e2384027e93d1f654ad100"></a>
+class&#160;</td><td class="memItemRight" valign="bottom"><b>tbb::tick_count</b></td></tr>
+<tr class="separator:a68e741a8f6e2384027e93d1f654ad100"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab5ceaed3ebf5a0d41088a5bc7c8dc653"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab5ceaed3ebf5a0d41088a5bc7c8dc653"></a>
+<a class="el" href="a00093.html">interval_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#ab5ceaed3ebf5a0d41088a5bc7c8dc653">operator-</a> (const <a class="el" href="a00202.html">tick_count</a> &amp;t1, const <a class="el" href="a00202.html">tick_count</a> &amp;t0)</td></tr>
+<tr class="memdesc:ab5ceaed3ebf5a0d41088a5bc7c8dc653"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract the intervals from the tick_counts and subtract them. <br/></td></tr>
+<tr class="separator:ab5ceaed3ebf5a0d41088a5bc7c8dc653"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac8910ee3b69f68eb905af787c273e9a8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac8910ee3b69f68eb905af787c273e9a8"></a>
+<a class="el" href="a00093.html">interval_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#ac8910ee3b69f68eb905af787c273e9a8">operator+</a> (const <a class="el" href="a00093.html">interval_t</a> &amp;i, const <a class="el" href="a00093.html">interval_t</a> &amp;j)</td></tr>
+<tr class="memdesc:ac8910ee3b69f68eb905af787c273e9a8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Add two intervals. <br/></td></tr>
+<tr class="separator:ac8910ee3b69f68eb905af787c273e9a8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3d11133daa9a7d3c903d070293278f8f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a3d11133daa9a7d3c903d070293278f8f"></a>
+<a class="el" href="a00093.html">interval_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00093.html#a3d11133daa9a7d3c903d070293278f8f">operator-</a> (const <a class="el" href="a00093.html">interval_t</a> &amp;i, const <a class="el" href="a00093.html">interval_t</a> &amp;j)</td></tr>
+<tr class="memdesc:a3d11133daa9a7d3c903d070293278f8f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Subtract two intervals. <br/></td></tr>
+<tr class="separator:a3d11133daa9a7d3c903d070293278f8f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="a00188.html">flow_graph.h</a></li>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Relative time interval. </p>
+</div><hr/>The documentation for this class was generated from the following file:<ul>
+<li>tick_count.h</li>
 </ul>
 </div><!-- contents -->
 <hr>
 <p></p>
-Copyright &copy; 2005-2014 Intel Corporation.  All Rights Reserved.
+Copyright &copy; 2005-2015 Intel Corporation.  All Rights Reserved.
 <p></p>
 Intel, Pentium, Intel Xeon, Itanium, Intel XScale and VTune are
 registered trademarks or trademarks of Intel Corporation or its

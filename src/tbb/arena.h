@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -52,9 +52,10 @@ struct arena_base : padded<intrusive_list_node> {
     //! Number of workers that have been marked out by the resource manager to service the arena
     unsigned my_num_workers_allotted;   // heavy use in stealing loop
 
-    //! References of the arena
-    /** Counts workers and master references separately. Bit 0 indicates reference from implicit
-        master or explicit task_arena; the next bits contain number of workers servicing the arena.*/
+    //! Reference counter for the arena.
+    /** Worker and master references are counted separately: first several bits are for references
+        from master threads or explicit task_arenas (see arena::ref_external_bits below);
+        the rest counts the number of workers servicing the arena. */
     atomic<unsigned> my_references;     // heavy use in stealing loop
 
 #if __TBB_TASK_PRIORITY
@@ -62,7 +63,7 @@ struct arena_base : padded<intrusive_list_node> {
     volatile intptr_t my_top_priority;  // heavy use in stealing loop
 #endif /* !__TBB_TASK_PRIORITY */
 
-    //! Maximal currently busy slot.
+    //! Maximal number of currently busy slots.
     atomic<unsigned> my_limit;          // heavy use in stealing loop
 
     //! Task pool for the tasks scheduled via task::enqueue() method
@@ -81,10 +82,6 @@ struct arena_base : padded<intrusive_list_node> {
 
     //! Number of workers requested by the master thread owning the arena
     unsigned my_max_num_workers;
-
-#if __TBB_TRACK_PRIORITY_LEVEL_SATURATION
-    int my_num_workers_present;
-#endif /* __TBB_TRACK_PRIORITY_LEVEL_SATURATION */
 
     //! Current task pool state and estimate of available tasks amount.
     /** The estimate is either 0 (SNAPSHOT_EMPTY) or infinity (SNAPSHOT_FULL). 
@@ -143,6 +140,9 @@ struct arena_base : padded<intrusive_list_node> {
     //! Number of slots in the arena
     unsigned my_num_slots;
 
+    //! Number of reserved slots (can be occupied only by masters)
+    unsigned my_num_reserved_slots;
+
     //! Indicates if there is an oversubscribing worker created to service enqueued tasks.
     bool my_mandatory_concurrency;
 
@@ -157,52 +157,24 @@ struct arena_base : padded<intrusive_list_node> {
 #endif /* TBB_USE_ASSERT */
 }; // struct arena_base
 
-class arena
-#if (__GNUC__<4 || __GNUC__==4 && __GNUC_MINOR__==0) && !__INTEL_COMPILER
-    : public padded<arena_base>
-#else
-    : private padded<arena_base>
-#endif
+class arena: public padded<arena_base>
 {
-private:
-    friend class generic_scheduler;
-    template<typename SchedulerTraits> friend class custom_scheduler;
-    friend class governor;
-    friend class task_scheduler_observer_v3;
-    friend class market;
-    friend class tbb::task;
-    friend class tbb::task_group_context;
-    friend class allocate_root_with_context_proxy;
-    friend class intrusive_list<arena>;
-    friend class interface7::internal::task_arena_base; // declared in scheduler_common.h
-    friend class interface7::internal::delegated_task;
-    friend class interface7::internal::wait_task;
-
+public:
     typedef padded<arena_base> base_type;
 
     //! Constructor
-    arena ( market&, unsigned max_num_workers );
+    arena ( market&, unsigned max_num_workers, unsigned num_reserved_slots );
 
     //! Allocate an instance of arena.
-    static arena& allocate_arena( market&, unsigned max_num_workers );
+    static arena& allocate_arena( market&, unsigned num_slots, unsigned num_reserved_slots );
 
-    static int unsigned num_slots_to_reserve ( unsigned max_num_workers ) {
-        return max(2u, max_num_workers + 1);
+    static int unsigned num_arena_slots ( unsigned num_slots ) {
+        return max(2u, num_slots);
     }
 
     static int allocation_size ( unsigned max_num_workers ) {
-        return sizeof(base_type) + num_slots_to_reserve(max_num_workers) * (sizeof(mail_outbox) + sizeof(arena_slot));
+        return sizeof(base_type) + num_arena_slots(max_num_workers) * (sizeof(mail_outbox) + sizeof(arena_slot));
     }
-
-#if __TBB_TASK_GROUP_CONTEXT
-    //! Finds all contexts affected by the state change and propagates the new state to them.
-    /** The propagation is relayed to the market because tasks created by one 
-        master thread can be passed to and executed by other masters. This means 
-        that context trees can span several arenas at once and thus state change
-        propagation cannot be generally localized to one arena only. **/
-    template <typename T>
-    bool propagate_task_group_state ( T task_group_context::*mptr_state, task_group_context& src, T new_state );
-#endif /* __TBB_TASK_GROUP_CONTEXT */
 
     //! Get reference to mailbox corresponding to given affinity_id.
     mail_outbox& mailbox( affinity_id id ) {
@@ -223,12 +195,19 @@ private:
     //! At least one task has been offered for stealing since the last snapshot started
     static const pool_state_t SNAPSHOT_FULL = pool_state_t(-1);
 
+    //! The number of least significant bits for external references
+    static const unsigned ref_external_bits = 12; // up to 4095 external and 1M workers
+
+    //! Reference increment values for externals and workers
+    static const unsigned ref_external = 1;
+    static const unsigned ref_worker   = 1<<ref_external_bits;
+
     //! No tasks to steal or snapshot is being taken.
     static bool is_busy_or_empty( pool_state_t s ) { return s < SNAPSHOT_FULL; }
 
     //! The number of workers active in the arena.
     unsigned num_workers_active( ) {
-        return my_references >> 1;
+        return my_references >> ref_external_bits;
     }
 
     //! If necessary, raise a flag that there is new job in arena.
@@ -245,7 +224,7 @@ private:
     void process( generic_scheduler& );
 
     //! Notification that worker or master leaves its arena
-    template<bool is_master>
+    template<unsigned ref_param>
     inline void on_thread_leaving ( );
 
 #if __TBB_STATISTICS
@@ -267,12 +246,18 @@ private:
     intptr_t workers_task_node_count();
 #endif
 
+    static const size_t out_of_arena = ~size_t(0);
+    //! Tries to occupy a slot in the arena. On success, returns the slot index; if no slot is available, returns out_of_arena.
+    template <bool as_worker>
+    size_t occupy_free_slot( generic_scheduler& s );
+    //! Tries to occupy a slot in the specified range.
+    size_t occupy_free_slot_in_range( generic_scheduler& s, size_t lower, size_t upper );
+
     /** Must be the last data field */
     arena_slot my_slots[1];
 }; // class arena
 
-
-template<bool is_master>
+template<unsigned ref_param>
 inline void arena::on_thread_leaving ( ) {
     //
     // Implementation of arena destruction synchronization logic contained various
@@ -287,6 +272,11 @@ inline void arena::on_thread_leaving ( ) {
     // to RML for threads, the arena object is destroyed only when both the last
     // thread is leaving it and arena's state is EMPTY (that is its master thread
     // left and it does not contain any work).
+    // Thus resetting arena to EMPTY state (as earlier TBB versions did) should not
+    // be done here (or anywhere else in the master thread to that matter); doing so
+    // can result either in arena's premature destruction (at least without
+    // additional costly checks in workers) or in unnecessary arena state changes
+    // (and ensuing workers migration).
     //
     // A worker that checks for work presence and transitions arena to the EMPTY
     // state (in snapshot taking procedure arena::is_out_of_work()) updates
@@ -314,7 +304,7 @@ inline void arena::on_thread_leaving ( ) {
     // In both cases we cannot dereference arena pointer after the refcount is
     // decremented, as our arena may already be destroyed.
     //
-    // If this is the master thread, market can be concurrently destroyed.
+    // If this is the master thread, the market is protected by refcount to it.
     // In case of workers market's liveness is ensured by the RML connection
     // rundown protocol, according to which the client (i.e. the market) lives
     // until RML server notifies it about connection termination, and this
@@ -325,9 +315,15 @@ inline void arena::on_thread_leaving ( ) {
     //
     uintptr_t aba_epoch = my_aba_epoch;
     market* m = my_market;
-    __TBB_ASSERT(my_references > int(!is_master), "broken arena reference counter");
-    if ( (my_references -= is_master? 1:2 ) == 0 ) // worker's counter starts from bit 1
-        market::try_destroy_arena( m, this, aba_epoch, is_master );
+    __TBB_ASSERT(my_references >= ref_param, "broken arena reference counter");
+#if __TBB_STATISTICS_EARLY_DUMP
+    // While still holding a reference to the arena, compute how many external references are left.
+    // If just one, dump statistics.
+    if ( modulo_power_of_two(my_references,ref_worker)==ref_param ) // may only be true with ref_external
+        GATHER_STATISTIC( dump_arena_statistics() );
+#endif
+    if ( (my_references -= ref_param ) == 0 )
+        m->try_destroy_arena( this, aba_epoch );
 }
 
 template<bool Spawned> void arena::advertise_new_work() {

@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -806,9 +806,8 @@ static const char* __itt_get_lib_name(void)
     return lib_name;
 }
 
-#ifndef min
-#define min(a,b) (a) < (b) ? (a) : (b)
-#endif /* min */
+/* Avoid clashes with std::min */
+#define __itt_min(a,b) (a) < (b) ? (a) : (b)
 
 static __itt_group_id __itt_get_groups(void)
 {
@@ -825,7 +824,7 @@ static __itt_group_id __itt_get_groups(void)
         while ((group_str = __itt_fsplit(group_str, ",; ", &chunk, &len)) != NULL)
         {
             __itt_fstrcpyn(gr, chunk, sizeof(gr) - 1);
-            gr[min(len, (int)(sizeof(gr) - 1))] = 0;
+            gr[__itt_min(len, (int)(sizeof(gr) - 1))] = 0;
 
             for (i = 0; group_list[i].name != NULL; i++)
             {

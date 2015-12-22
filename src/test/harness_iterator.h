@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -91,8 +91,10 @@ public:
     T& operator* () { return *my_ptr; }
     RandomIterator& operator++ () { ++my_ptr; return *this; }
     bool operator== ( const RandomIterator& r ) { return my_ptr == r.my_ptr; }
-    difference_type operator- (const RandomIterator &r) {return my_ptr - r.my_ptr;}
+    bool operator!= ( const RandomIterator& r ) { return my_ptr != r.my_ptr; }
+    difference_type operator- (const RandomIterator &r) const {return my_ptr - r.my_ptr;}
     RandomIterator operator+ (difference_type n) {return RandomIterator(my_ptr + n);}
+    bool operator< (const RandomIterator &r) const {return my_ptr < r.my_ptr;}
 };
 
 template <class T>
@@ -116,8 +118,10 @@ public:
     const T& operator* () { return *my_ptr; }
     ConstRandomIterator& operator++ () { ++my_ptr; return *this; }
     bool operator== ( const ConstRandomIterator& r ) { return my_ptr == r.my_ptr; }
-    difference_type operator- (const ConstRandomIterator &r) {return my_ptr - r.my_ptr;}
+    bool operator!= ( const ConstRandomIterator& r ) { return my_ptr != r.my_ptr; }
+    difference_type operator- (const ConstRandomIterator &r) const {return my_ptr - r.my_ptr;}
     ConstRandomIterator operator+ (difference_type n) {return ConstRandomIterator(my_ptr + n);}
+    bool operator< (const ConstRandomIterator &r) const {return my_ptr < r.my_ptr;}
 };
 
 } // namespace Harness

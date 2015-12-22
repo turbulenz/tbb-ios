@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.4"/>
-<title>tbb::flow::interface7::buffer_node&lt; T, A &gt;::buffer_operation Class Reference</title>
+<title>tbb::blocked_range2d&lt; RowValue, ColValue &gt; Class Template Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -33,68 +33,89 @@
   </div>
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="a00231.html">tbb</a></li><li class="navelem"><b>flow</b></li><li class="navelem"><b>interface7</b></li><li class="navelem"><a class="el" href="a00027.html">buffer_node</a></li><li class="navelem"><a class="el" href="a00028.html">buffer_operation</a></li>  </ul>
+<li class="navelem"><a class="el" href="a00274.html">tbb</a></li><li class="navelem"><a class="el" href="a00028.html">blocked_range2d</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="#pub-attribs">Public Attributes</a> &#124;
-<a href="a00336.html">List of all members</a>  </div>
+<a href="#pub-static-attribs">Static Public Attributes</a> &#124;
+<a href="a00302.html">List of all members</a>  </div>
   <div class="headertitle">
-<div class="title">tbb::flow::interface7::buffer_node&lt; T, A &gt;::buffer_operation Class Reference</div>  </div>
+<div class="title">tbb::blocked_range2d&lt; RowValue, ColValue &gt; Class Template Reference<div class="ingroups"><a class="el" href="a00289.html">Algorithms</a></div></div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="dynheader">
-Inheritance diagram for tbb::flow::interface7::buffer_node&lt; T, A &gt;::buffer_operation:</div>
-<div class="dyncontent">
- <div class="center">
-  <img src="a00028.png" usemap="#tbb::flow::interface7::buffer_node&lt; T, A &gt;::buffer_operation_map" alt=""/>
-  <map id="tbb::flow::interface7::buffer_node&lt; T, A &gt;::buffer_operation_map" name="tbb::flow::interface7::buffer_node&lt; T, A &gt;::buffer_operation_map">
-</map>
- </div></div>
+
+<p>A 2-dimensional range that models the Range concept.  
+ <a href="a00028.html#details">More...</a></p>
+
+<p><code>#include &lt;blocked_range2d.h&gt;</code></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:ada609b296a9af0591cc34761b8538100"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ada609b296a9af0591cc34761b8538100"></a>
+typedef <a class="el" href="a00027.html">blocked_range</a>&lt; RowValue &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00028.html#ada609b296a9af0591cc34761b8538100">row_range_type</a></td></tr>
+<tr class="memdesc:ada609b296a9af0591cc34761b8538100"><td class="mdescLeft">&#160;</td><td class="mdescRight">Type for size of an iteration range. <br/></td></tr>
+<tr class="separator:ada609b296a9af0591cc34761b8538100"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9820ed2f2560633d18bf35cece8b6493"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9820ed2f2560633d18bf35cece8b6493"></a>
+typedef <a class="el" href="a00027.html">blocked_range</a>&lt; ColValue &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>col_range_type</b></td></tr>
+<tr class="separator:a9820ed2f2560633d18bf35cece8b6493"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a77b9eaaed3b74938679461fa5d1986e1"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a77b9eaaed3b74938679461fa5d1986e1"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>buffer_operation</b> (const T &amp;e, op_type t)</td></tr>
-<tr class="separator:a77b9eaaed3b74938679461fa5d1986e1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5aa4e2c389c4b833937fcad66efe2b6a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5aa4e2c389c4b833937fcad66efe2b6a"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>blocked_range2d</b> (RowValue row_begin, RowValue row_end, typename <a class="el" href="a00027.html#a89b300cecd9d617e4ee801c786756e55">row_range_type::size_type</a> row_grainsize, ColValue col_begin, ColValue col_end, typename <a class="el" href="a00027.html#a89b300cecd9d617e4ee801c786756e55">col_range_type::size_type</a> col_grainsize)</td></tr>
+<tr class="separator:a5aa4e2c389c4b833937fcad66efe2b6a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaf45f93921022437fdcb500585768a5e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aaf45f93921022437fdcb500585768a5e"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>blocked_range2d</b> (RowValue row_begin, RowValue row_end, ColValue col_begin, ColValue col_end)</td></tr>
+<tr class="separator:aaf45f93921022437fdcb500585768a5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5805972c8c41b2681d286f9c9771cf52"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5805972c8c41b2681d286f9c9771cf52"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00028.html#a5805972c8c41b2681d286f9c9771cf52">empty</a> () const </td></tr>
+<tr class="memdesc:a5805972c8c41b2681d286f9c9771cf52"><td class="mdescLeft">&#160;</td><td class="mdescRight">True if range is empty. <br/></td></tr>
+<tr class="separator:a5805972c8c41b2681d286f9c9771cf52"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac84c6cc2ff8b0974ffa719fed804f586"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac84c6cc2ff8b0974ffa719fed804f586"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00028.html#ac84c6cc2ff8b0974ffa719fed804f586">is_divisible</a> () const </td></tr>
+<tr class="memdesc:ac84c6cc2ff8b0974ffa719fed804f586"><td class="mdescLeft">&#160;</td><td class="mdescRight">True if range is divisible into two pieces. <br/></td></tr>
+<tr class="separator:ac84c6cc2ff8b0974ffa719fed804f586"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af0e752d01b661b01c9a473473bea43fc"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af0e752d01b661b01c9a473473bea43fc"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>blocked_range2d</b> (<a class="el" href="a00028.html">blocked_range2d</a> &amp;r, split)</td></tr>
+<tr class="separator:af0e752d01b661b01c9a473473bea43fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9ebbf0fa580c0553ec2e3c5997b9799c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a9ebbf0fa580c0553ec2e3c5997b9799c"></a>
+&#160;</td><td class="memItemRight" valign="bottom"><b>blocked_range2d</b> (<a class="el" href="a00028.html">blocked_range2d</a> &amp;r, proportional_split &amp;proportion)</td></tr>
+<tr class="separator:a9ebbf0fa580c0553ec2e3c5997b9799c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a06ae436bae2c8be5a95212ea410791db"><td class="memTemplParams" colspan="2"><a class="anchor" id="a06ae436bae2c8be5a95212ea410791db"></a>
+template&lt;typename Split &gt; </td></tr>
+<tr class="memitem:a06ae436bae2c8be5a95212ea410791db"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><b>do_split</b> (<a class="el" href="a00028.html">blocked_range2d</a> &amp;r, Split &amp;split_obj)</td></tr>
+<tr class="separator:a06ae436bae2c8be5a95212ea410791db"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4f7299e74c40df57dee2433c07ce65ae"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4f7299e74c40df57dee2433c07ce65ae"></a>
+const <a class="el" href="a00028.html#ada609b296a9af0591cc34761b8538100">row_range_type</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00028.html#a4f7299e74c40df57dee2433c07ce65ae">rows</a> () const </td></tr>
+<tr class="memdesc:a4f7299e74c40df57dee2433c07ce65ae"><td class="mdescLeft">&#160;</td><td class="mdescRight">The rows of the iteration space. <br/></td></tr>
+<tr class="separator:a4f7299e74c40df57dee2433c07ce65ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af3bccfaf90126b285491096f78ca9473"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af3bccfaf90126b285491096f78ca9473"></a>
+const <a class="el" href="a00027.html">col_range_type</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00028.html#af3bccfaf90126b285491096f78ca9473">cols</a> () const </td></tr>
+<tr class="memdesc:af3bccfaf90126b285491096f78ca9473"><td class="mdescLeft">&#160;</td><td class="mdescRight">The columns of the iteration space. <br/></td></tr>
+<tr class="separator:af3bccfaf90126b285491096f78ca9473"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
-Public Attributes</h2></td></tr>
-<tr class="memitem:a55e368638761b5ce3827537e24cb42be"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a55e368638761b5ce3827537e24cb42be"></a>
-char&#160;</td><td class="memItemRight" valign="bottom"><b>type</b></td></tr>
-<tr class="separator:a55e368638761b5ce3827537e24cb42be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abffd4381c42c8649a55a84c8b3bcdaf6"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abffd4381c42c8649a55a84c8b3bcdaf6"></a>
-task *&#160;</td><td class="memItemRight" valign="bottom"><b>ltask</b></td></tr>
-<tr class="separator:abffd4381c42c8649a55a84c8b3bcdaf6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acfc7bfd392d3df23d72022c6747c7500"><td class="memItemLeft" ><a class="anchor" id="acfc7bfd392d3df23d72022c6747c7500"></a>
-union {</td></tr>
-<tr class="memitem:a8604f4565a9775acc626b615270d05f9"><td class="memItemLeft" >&#160;&#160;&#160;input_type *&#160;&#160;&#160;<b>elem</b></td></tr>
-<tr class="separator:a8604f4565a9775acc626b615270d05f9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abb6eba4187566eebb8b08c66b7c02fea"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="a00136.html#a7779627063a29d4d2a1fc905a5cae8db">successor_type</a> *&#160;&#160;&#160;<b>r</b></td></tr>
-<tr class="separator:abb6eba4187566eebb8b08c66b7c02fea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af51cf10e00fb3e14f6452e4eeeb440eb"><td class="memItemLeft" >&#160;&#160;&#160;<a class="el" href="a00118.html#afbadf5511bd568d283040cd88bd4e81e">predecessor_type</a> *&#160;&#160;&#160;<b>p</b></td></tr>
-<tr class="separator:af51cf10e00fb3e14f6452e4eeeb440eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a096faad0d5b0081fbe536995fae63b8e"><td class="memItemLeft" >&#160;&#160;&#160;size_t&#160;&#160;&#160;<b>cnt_val</b></td></tr>
-<tr class="separator:a096faad0d5b0081fbe536995fae63b8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6e9052154d38b921db40a14851f75025"><td class="memItemLeft" >&#160;&#160;&#160;successor_vector_type *&#160;&#160;&#160;<b>svec</b></td></tr>
-<tr class="separator:a6e9052154d38b921db40a14851f75025"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaa0a9040c16a4d6bf3eb6f557241bd9b"><td class="memItemLeft" >&#160;&#160;&#160;predecessor_vector_type *&#160;&#160;&#160;<b>pvec</b></td></tr>
-<tr class="separator:aaa0a9040c16a4d6bf3eb6f557241bd9b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acfc7bfd392d3df23d72022c6747c7500"><td class="memItemLeft" valign="top">};&#160;</td><td class="memItemRight" valign="bottom"></td></tr>
-<tr class="separator:acfc7bfd392d3df23d72022c6747c7500"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6b8cdbd2350a186908b1cc55119e4556"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6b8cdbd2350a186908b1cc55119e4556"></a>
-T *&#160;</td><td class="memItemRight" valign="bottom"><b>elem</b></td></tr>
-<tr class="separator:a6b8cdbd2350a186908b1cc55119e4556"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-attribs"></a>
+Static Public Attributes</h2></td></tr>
+<tr class="memitem:aa0519760654368000f7ebc87d9bfe898"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa0519760654368000f7ebc87d9bfe898"></a>
+static const bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="a00028.html#aa0519760654368000f7ebc87d9bfe898">is_splittable_in_proportion</a> = true</td></tr>
+<tr class="memdesc:aa0519760654368000f7ebc87d9bfe898"><td class="mdescLeft">&#160;</td><td class="mdescRight">Static field to support proportional split. <br/></td></tr>
+<tr class="separator:aa0519760654368000f7ebc87d9bfe898"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="a00188.html">flow_graph.h</a></li>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><h3>template&lt;typename RowValue, typename ColValue = RowValue&gt;<br/>
+class tbb::blocked_range2d&lt; RowValue, ColValue &gt;</h3>
+
+<p>A 2-dimensional range that models the Range concept. </p>
+</div><hr/>The documentation for this class was generated from the following file:<ul>
+<li>blocked_range2d.h</li>
 </ul>
 </div><!-- contents -->
 <hr>
 <p></p>
-Copyright &copy; 2005-2014 Intel Corporation.  All Rights Reserved.
+Copyright &copy; 2005-2015 Intel Corporation.  All Rights Reserved.
 <p></p>
 Intel, Pentium, Intel Xeon, Itanium, Intel XScale and VTune are
 registered trademarks or trademarks of Intel Corporation or its

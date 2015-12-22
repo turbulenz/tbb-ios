@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -58,6 +58,33 @@ struct Foo {
 inline char PseudoRandomValue( size_t j, size_t k ) {
     return char(j*3 ^ j>>4 ^ k);
 }
+
+#if __APPLE__
+#include <fcntl.h>
+#include <unistd.h>
+
+// A RAII class to disable stderr in a certain scope. It's not thread-safe.
+class DisableStderr {
+    int stderrCopy;
+    static void dupToStderrAndClose(int fd) {
+        int ret = dup2(fd, STDERR_FILENO); // close current stderr
+        ASSERT(ret != -1, NULL);
+        ret = close(fd);
+        ASSERT(ret != -1, NULL);
+    }
+public:
+    DisableStderr() {
+        int devNull = open("/dev/null", O_WRONLY);
+        ASSERT(devNull != -1, NULL);
+        stderrCopy = dup(STDERR_FILENO);
+        ASSERT(stderrCopy != -1, NULL);
+        dupToStderrAndClose(devNull);
+    }
+    ~DisableStderr() {
+        dupToStderrAndClose(stderrCopy);
+    }
+};
+#endif
 
 //! T is type and A is allocator for that type 
 template<typename T, typename A>
@@ -132,6 +159,24 @@ void TestBasic( A& a ) {
     a.destroy( p );
     ASSERT( NumberOfFoo==n, "destructor for Foo not called?" );
     a.deallocate(p,1);
+
+#if TBB_USE_EXCEPTIONS
+    size_t too_big = (~size_t(0) - 1024*1024)/sizeof(T);
+    bool exception_caught = false;
+    typename A::pointer p1 = NULL;
+    try {
+#if __APPLE__
+        // On OS X*, failure to map memory results in messages to stderr;
+        // suppress them.
+        DisableStderr disableStderr;
+#endif
+        p1 = a.allocate(too_big);
+    } catch ( std::bad_alloc ) {
+        exception_caught = true;
+    }
+    ASSERT( exception_caught, "allocate expected to throw bad_alloc" );
+    a.deallocate(p1, too_big);
+#endif // TBB_USE_EXCEPTIONS
 
     #if __TBB_ALLOCATOR_CONSTRUCT_VARIADIC
     {
@@ -220,7 +265,7 @@ void Test(A &a) {
 }
 
 template<typename Allocator>
-int TestMain(const Allocator &a = Allocator() ) {
+int TestMain(const Allocator &a = Allocator()) {
     NumberOfFoo = 0;
     typename Allocator::template rebind<Foo<char,1> >::other a1(a);
     typename Allocator::template rebind<Foo<double,1> >::other a2(a);
@@ -228,4 +273,3 @@ int TestMain(const Allocator &a = Allocator() ) {
     Test<Foo<float,23> >( a2 );
     return 0;
 }
-

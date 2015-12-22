@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -41,8 +41,7 @@
 #endif
 
 #include <stdexcept>
-
-#include <utility>    // for std::swap
+#include <algorithm>  // std::swap
 
 #if !TBB_USE_EXCEPTIONS && _MSC_VER
     #pragma warning (pop)
@@ -61,7 +60,12 @@ using std::printf;
 #if defined(_Wp64)
     #pragma warning (disable: 4267)
 #endif
+#if _MSC_VER <= 1600
+    #pragma warning (disable: 4355)
+#endif
+#if _MSC_VER <= 1800
     #pragma warning (disable: 4512)
+#endif
 #endif
 
 #if TBB_INTERFACE_VERSION >= 7005
@@ -162,7 +166,7 @@ public:
     //! Destroy value at location pointed to by p.
     void destroy( pointer p ) {
         p->~value_type();
-#if _MSC_VER == 1800
+#if _MSC_VER <= 1800 && defined(_MSC_VER) && !defined(__INTEL_COMPILER)
         tbb::internal::suppress_unused_warning(p);
 #endif
     }
@@ -237,9 +241,10 @@ public:
                 __TBB_THROW( std::bad_alloc() );
             return NULL;
         }
+        pointer p = base_alloc_t::allocate(n, pointer(0));
         allocations++;
         items_allocated += n;
-        return base_alloc_t::allocate(n, pointer(0));
+        return p;
     }
 
     pointer allocate(const size_type n, const void * const)
@@ -473,9 +478,10 @@ public:
     {
         if(max_items && items_allocated + n >= max_items)
             __TBB_THROW( std::bad_alloc() );
+        pointer p = base_alloc_t::allocate(n, pointer(0));
         ++allocations;
         items_allocated += n;
-        return base_alloc_t::allocate(n, pointer(0));
+        return p;
     }
 
     pointer allocate(const size_type n, const void * const)
@@ -580,10 +586,10 @@ public:
 
 };
 
-#if defined(_MSC_VER)
-    // Workaround for overzealous compiler warnings in /Wp64 mode
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+    // Workaround for overzealous compiler warnings
     #pragma warning (pop)
-#endif // warning 4267,4512 is back
+#endif // warning 4267,4512,4355 is back
 
 namespace Harness {
 
@@ -593,6 +599,11 @@ namespace Harness {
         static bool compare( const std::weak_ptr<T> &t1, const std::weak_ptr<T> &t2 ) {
             // Compare real pointers.
             return t1.lock().get() == t2.lock().get();
+        }
+        template <typename T>
+        static bool compare( const std::unique_ptr<T> &t1, const std::unique_ptr<T> &t2 ) {
+            // Compare real values.
+            return *t1 == *t2;
         }
         template <typename T1, typename T2>
         static bool compare( const std::pair< const std::weak_ptr<T1>, std::weak_ptr<T2> > &t1,

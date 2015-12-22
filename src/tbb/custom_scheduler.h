@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -27,17 +27,6 @@
 
 namespace tbb {
 namespace internal {
-
-//! Amount of time to pause between steals.
-/** The default values below were found to be best empirically for K-Means
-    on the 32-way Altix and 4-way (*2 for HT) fxqlin04. */
-#ifdef __TBB_STEALING_PAUSE
-static const long PauseTime = __TBB_STEALING_PAUSE;
-#elif __TBB_ipf
-static const long PauseTime = 1500;
-#else
-static const long PauseTime = 80;
-#endif
 
 //------------------------------------------------------------------------
 //! Traits classes for scheduler
@@ -67,6 +56,8 @@ template<typename SchedulerTraits>
 class custom_scheduler: private generic_scheduler {
     typedef custom_scheduler<SchedulerTraits> scheduler_type;
 
+    custom_scheduler( market& m ) : generic_scheduler(m) {}
+
     //! Scheduler loop that dispatches tasks.
     /** If child is non-NULL, it is dispatched first.
         Then, until "parent" has a reference count of 1, other task are dispatched or stolen. */
@@ -80,9 +71,6 @@ class custom_scheduler: private generic_scheduler {
     void wait_for_all( task& parent, task* child ) {
         static_cast<custom_scheduler*>(governor::local_scheduler())->scheduler_type::local_wait_for_all( parent, child );
     }
-
-    //! Construct a custom_scheduler
-    custom_scheduler( arena* a, size_t index ) : generic_scheduler(a, index) {}
 
     //! Decrements ref_count of a predecessor.
     /** If it achieves 0, the predecessor is scheduled for execution.
@@ -121,9 +109,10 @@ class custom_scheduler: private generic_scheduler {
     }
 
 public:
-    static generic_scheduler* allocate_scheduler( arena* a, size_t index ) {
-        scheduler_type* s = (scheduler_type*)NFS_Allocate(1,sizeof(scheduler_type),NULL);
-        new( s ) scheduler_type( a, index );
+    static generic_scheduler* allocate_scheduler( market& m ) {
+        void* p = NFS_Allocate(1, sizeof(scheduler_type), NULL);
+        std::memset(p, 0, sizeof(scheduler_type));
+        scheduler_type* s = new( p ) scheduler_type( m );
         s->assert_task_pool_valid();
         ITT_SYNC_CREATE(s, SyncType_Scheduler, SyncObj_TaskPoolSpinning);
         return s;
@@ -273,7 +262,7 @@ fail:
             failure_count = 0;
         }
         // Pause, even if we are going to yield, because the yield might return immediately.
-        __TBB_Pause(PauseTime);
+        prolonged_pause();
         const int failure_threshold = 2*int(n+1);
         if( failure_count>=failure_threshold ) {
 #if __TBB_YIELD2P
@@ -359,7 +348,7 @@ void custom_scheduler<SchedulerTraits>::local_wait_for_all( task& parent, task* 
     if( SchedulerTraits::itt_possible )
         ITT_SYNC_CREATE(&parent.prefix().ref_count, SyncType_Scheduler, SyncObj_TaskStealingLoop);
 #if __TBB_TASK_GROUP_CONTEXT
-    __TBB_ASSERT( parent.prefix().context || (is_worker() && &parent == my_dummy_task), "parent task does not have context" );
+    __TBB_ASSERT( parent.prefix().context, "parent task does not have context" );
 #endif /* __TBB_TASK_GROUP_CONTEXT */
     task* t = child;
     // Constant all_local_work_done is an unreachable refcount value that prevents
@@ -441,7 +430,7 @@ void custom_scheduler<SchedulerTraits>::local_wait_for_all( task& parent, task* 
                             *my_offloaded_task_list_tail_link = NULL;
                         }
                         offload_task( *t, p );
-                        if ( in_arena() ) {
+                        if ( is_task_pool_published() ) {
                             t = winnow_task_pool();
                             if ( t )
                                 continue;
@@ -543,7 +532,7 @@ void custom_scheduler<SchedulerTraits>::local_wait_for_all( task& parent, task* 
                 ITT_NOTIFY(sync_acquired, &parent.prefix().ref_count);
                 goto done;
             }
-            if ( in_arena() ) {
+            if ( is_task_pool_published() ) {
                 t = get_task();
             }
             else {
@@ -569,7 +558,7 @@ stealing_ground:
         }
 #endif
         if ( quit_point == all_local_work_done ) {
-            __TBB_ASSERT( !in_arena() && is_quiescent_local_task_pool_reset(), NULL );
+            __TBB_ASSERT( !is_task_pool_published() && is_quiescent_local_task_pool_reset(), NULL );
             __TBB_ASSERT( !worker_outermost_level(), NULL );
             my_innermost_running_task = my_dispatching_task;
             my_dispatching_task = old_dispatching_task;

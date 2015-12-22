@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -215,12 +215,10 @@ void buffered_levels_with_copy( size_t concurrency ) {
         size_t global_count = global_execute_count;
         size_t inc_count = body_copy.local_execute_count;
         ASSERT( global_count == expected_count && global_count == inc_count, NULL ); 
-#if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         g.reset(tbb::flow::rf_reset_bodies);
         body_copy = tbb::flow::copy_body<inc_functor>( exe_node );
         inc_count = body_copy.local_execute_count;
         ASSERT( Offset == inc_count, "reset(rf_reset_bodies) did not reset functor" ); 
-#endif
     }
 }
 
@@ -274,10 +272,10 @@ void concurrency_levels( size_t concurrency, Body body ) {
         }
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
         ASSERT(exe_node.successor_count() == num_receivers, NULL);
-        typename fnode_type::successor_vector_type my_succs;
+        typename fnode_type::successor_list_type my_succs;
         exe_node.copy_successors(my_succs);
         ASSERT(my_succs.size() == num_receivers, NULL);
-        typename fnode_type::predecessor_vector_type my_preds;
+        typename fnode_type::predecessor_list_type my_preds;
         exe_node.copy_predecessors(my_preds);
         ASSERT(my_preds.size() == 0, NULL);
 #endif
@@ -460,7 +458,7 @@ struct add_to_counter {
     int operator()(int i){*counter+=1; return i + 1;}
 };
 
-template<tbb::flow::graph_buffer_policy FTYPE>
+template<typename FTYPE>
 void test_extract() {
     int my_count = 0;
     int cm;
